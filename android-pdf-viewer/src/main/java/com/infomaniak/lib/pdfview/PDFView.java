@@ -267,7 +267,6 @@ public class PDFView extends RelativeLayout {
     }
 
     private void load(DocumentSource docSource, String password, int[] userPages) {
-
         if (!recycled) {
             throw new IllegalStateException("Don't call load on a PDF View without recycling it first.");
         }
@@ -781,14 +780,15 @@ public class PDFView extends RelativeLayout {
         jumpTo(defaultPage, false);
     }
 
-    void loadError(Throwable t) {
+    void loadError(Throwable t, DocumentSource docSource) {
         state = State.ERROR;
         // store reference, because callbacks will be cleared in recycle() method
         OnErrorListener onErrorListener = callbacks.getOnError();
         recycle();
         invalidate();
         if (onErrorListener != null) {
-            onErrorListener.onError(t);
+            Uri uri = docSource instanceof UriSource ? ((UriSource) docSource).getUri() : null;
+            onErrorListener.onError(t, uri);
         } else {
             Log.e("PDFView", "load pdf error", t);
         }

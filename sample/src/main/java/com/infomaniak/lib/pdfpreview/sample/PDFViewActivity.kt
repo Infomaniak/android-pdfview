@@ -1,19 +1,19 @@
 package com.infomaniak.lib.pdfpreview.sample
 
-import android.Manifest.permission.READ_MEDIA_IMAGES
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
-import android.provider.OpenableColumns
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.infomaniak.lib.pdfview.listener.OnErrorListener
 import com.infomaniak.lib.pdfview.listener.OnLoadCompleteListener
 import com.infomaniak.lib.pdfview.listener.OnPageChangeListener
 import com.infomaniak.lib.pdfview.listener.OnPageErrorListener
@@ -22,8 +22,10 @@ import com.infomaniak.lib.pdfview.sample.databinding.ActivityMainBinding
 import com.infomaniak.lib.pdfview.scroll.DefaultScrollHandle
 import com.infomaniak.lib.pdfview.util.FitPolicy
 import com.shockwave.pdfium.PdfDocument
+import com.shockwave.pdfium.PdfPasswordException
 
-class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadCompleteListener, OnPageErrorListener {
+class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadCompleteListener,
+    OnPageErrorListener, OnErrorListener {
 
     companion object {
         private val TAG: String = PDFViewActivity::class.java.simpleName
@@ -37,6 +39,8 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
     private var pdfFileName: String? = null
 
     private val binding by lazy { ActivityMainBinding.inflate(layoutInflater) }
+    private val viewModel: PDFViewViewModel by viewModels()
+
     private val selectFileResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { activityResult ->
         if (activityResult.resultCode == RESULT_OK) {
             activityResult.data?.let { intent ->
@@ -90,53 +94,39 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
         title = pdfFileName
     }
 
-    private fun displayFromAsset() {
+    private fun displayFromAsset(password: String? = null) {
         pdfFileName = SAMPLE_FILE
         binding.pdfView.fromAsset(SAMPLE_FILE)
-                .defaultPage(pageNumber)
-                .onPageChange(this)
-                .enableAnnotationRendering(true)
-                .onLoad(this)
-                .scrollHandle(DefaultScrollHandle(this))
-                .spacing(10) // in dp
-                .onPageError(this)
-                .pageFitPolicy(FitPolicy.BOTH)
-                .load()
+            .defaultPage(pageNumber)
+            .onPageChange(this)
+            .enableAnnotationRendering(true)
+            .onLoad(this)
+            .scrollHandle(DefaultScrollHandle(this))
+            .spacing(10) // in dp
+            .onPageError(this)
+            .pageFitPolicy(FitPolicy.BOTH)
+            .password(password)
+            .load()
     }
 
-    private fun displayFromUri(uri: Uri?) {
-        pdfFileName = getFileName(uri)
+    private fun displayFromUri(uri: Uri?, password: String? = null) {
+        pdfFileName = viewModel.getFileName(contentResolver, uri)
         binding.pdfView.fromUri(uri)
-                .defaultPage(pageNumber)
-                .onPageChange(this)
-                .enableAnnotationRendering(true)
-                .onLoad(this)
-                .scrollHandle(DefaultScrollHandle(this))
-                .spacing(10) // in dp
-                .onPageError(this)
-                .load()
+            .defaultPage(pageNumber)
+            .onPageChange(this)
+            .enableAnnotationRendering(true)
+            .onLoad(this)
+            .scrollHandle(DefaultScrollHandle(this))
+            .spacing(10) // in dp
+            .password(password)
+            .onPageError(this)
+            .onError(this)
+            .load()
     }
 
     override fun onPageChanged(page: Int, pageCount: Int) {
         pageNumber = page
         title = String.format("%s %s / %s", pdfFileName, page + 1, pageCount)
-    }
-
-    private fun getFileName(uri: Uri?): String? {
-        var result: String? = null
-        if (uri!!.scheme == "content") {
-            val cursor = contentResolver.query(uri, null, null, null, null)
-            cursor.use { cursor ->
-                if (cursor != null && cursor.moveToFirst()) {
-                    val columnIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    result = cursor.getString(columnIndex)
-                }
-            }
-        }
-        if (result == null) {
-            result = uri.lastPathSegment
-        }
-        return result
     }
 
     override fun loadComplete(nbPages: Int) {
@@ -180,5 +170,17 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
 
     override fun onPageError(page: Int, t: Throwable) {
         Log.e(TAG, "Cannot load page $page")
+    }
+
+    private fun openPasswordDialog(uri: Uri?) {
+        PasswordDialog(onPasswordEntered = { password ->
+            displayFromUri(uri, password)
+        }).also { it.show(supportFragmentManager, "TAG") }
+    }
+
+    override fun onError(throwable: Throwable?, uri: Uri?) {
+        when (throwable) {
+            is PdfPasswordException -> openPasswordDialog(uri)
+        }
     }
 }

@@ -32,6 +32,10 @@ public class UriSource implements DocumentSource {
         this.uri = uri;
     }
 
+    public Uri getUri() {
+        return uri;
+    }
+
     @Override
     public PdfDocument createDocument(Context context, PdfiumCore core, String password) throws IOException {
         ParcelFileDescriptor pfd = context.getContentResolver().openFileDescriptor(uri, "r");

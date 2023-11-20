@@ -15,11 +15,13 @@
  */
 package com.infomaniak.lib.pdfview.listener;
 
+import android.net.Uri;
+
 public interface OnErrorListener {
 
     /**
      * Called if error occurred while opening PDF
      * @param t Throwable with error
      */
-    void onError(Throwable t);
+    void onError(Throwable t, Uri uri);
 }
