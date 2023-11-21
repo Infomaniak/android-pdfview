@@ -172,15 +172,15 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
         Log.e(TAG, "Cannot load page $page")
     }
 
-    private fun openPasswordDialog(uri: Uri?) {
+    private fun openPasswordDialog() {
         PasswordDialog(onPasswordEntered = { password ->
             displayFromUri(uri, password)
         }).also { it.show(supportFragmentManager, "TAG") }
     }
 
-    override fun onError(throwable: Throwable?, uri: Uri?) {
+    override fun onError(throwable: Throwable?) {
         when (throwable) {
-            is PdfPasswordException -> openPasswordDialog(uri)
+            is PdfPasswordException -> openPasswordDialog()
         }
     }
 }

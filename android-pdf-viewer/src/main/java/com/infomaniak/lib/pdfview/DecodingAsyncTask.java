@@ -73,7 +73,7 @@ class DecodingAsyncTask extends AsyncTask<Void, Void, Throwable> {
         PDFView pdfView = pdfViewReference.get();
         if (pdfView != null) {
             if (t != null) {
-                pdfView.loadError(t, docSource);
+                pdfView.loadError(t);
                 return;
             }
             if (!cancelled) {
