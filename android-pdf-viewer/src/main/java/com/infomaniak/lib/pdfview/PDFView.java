@@ -251,6 +251,16 @@ public class PDFView extends RelativeLayout {
     private float thumbnailRatio = Constants.THUMBNAIL_RATIO;
 
     /**
+     * Horizontal border in pixels. This value represent how far you can scroll after an horizontal border of the PDF.
+     */
+    private int horizontalBorder = 0;
+
+    /**
+     * Vertical border in pixels. This value represent how far you can scroll after an vertical border of the PDF.
+     */
+    private int verticalBorder = 0;
+
+    /**
      * True if annotations should be rendered
      * False otherwise
      */
@@ -935,7 +945,7 @@ public class PDFView extends RelativeLayout {
 
     /**
      * Move to the given X and Y offsets, but check them ahead of time
-     * to be sure not to go outside the the big strip.
+     * to be sure not to go outside the big strip.
      *
      * @param offsetX    The big strip X offset to use as the left border of the screen.
      * @param offsetY    The big strip Y offset to use as the right border of the screen.
@@ -946,12 +956,12 @@ public class PDFView extends RelativeLayout {
             // Check X offset
             float scaledPageWidth = toCurrentScale(pdfFile.getMaxPageWidth());
             if (scaledPageWidth < getWidth()) {
-                offsetX = getWidth() / 2 - scaledPageWidth / 2;
+                offsetX = getWidth() / 2f - scaledPageWidth / 2f;
             } else {
-                if (offsetX > 0) {
-                    offsetX = 0;
-                } else if (offsetX + scaledPageWidth < getWidth()) {
-                    offsetX = getWidth() - scaledPageWidth;
+                if (offsetX > horizontalBorder) {
+                    offsetX = horizontalBorder;
+                } else if (offsetX + scaledPageWidth + horizontalBorder < getWidth()) {
+                    offsetX = getWidth() - scaledPageWidth - horizontalBorder;
                 }
             }
 
@@ -960,10 +970,11 @@ public class PDFView extends RelativeLayout {
             if (contentHeight < getHeight()) { // whole document height visible on screen
                 offsetY = (getHeight() - contentHeight) / 2;
             } else {
-                if (offsetY > 0) { // top visible
-                    offsetY = 0;
-                } else if (offsetY + contentHeight < getHeight()) { // bottom visible
-                    offsetY = -contentHeight + getHeight();
+                float maxOffsetY = toCurrentScale((verticalBorder * 2f) - startSpacing);
+                if (offsetY > maxOffsetY) { // top visible
+                    offsetY = maxOffsetY;
+                } else if (offsetY + contentHeight + toCurrentScale((verticalBorder * 2)) < getHeight() + toCurrentScale(endSpacing)) { // bottom visible
+                    offsetY = -contentHeight + getHeight() + toCurrentScale(endSpacing - (verticalBorder * 2f));
                 }
             }
 
@@ -978,24 +989,25 @@ public class PDFView extends RelativeLayout {
             // Check Y offset
             float scaledPageHeight = toCurrentScale(pdfFile.getMaxPageHeight());
             if (scaledPageHeight < getHeight()) {
-                offsetY = getHeight() / 2 - scaledPageHeight / 2;
+                offsetY = getHeight() / 2f - scaledPageHeight / 2f;
             } else {
-                if (offsetY > 0) {
-                    offsetY = 0;
-                } else if (offsetY + scaledPageHeight < getHeight()) {
-                    offsetY = getHeight() - scaledPageHeight;
+                if (offsetY > horizontalBorder) {
+                    offsetY = horizontalBorder;
+                } else if (offsetY + scaledPageHeight + horizontalBorder < getHeight()) {
+                    offsetY = getHeight() - scaledPageHeight - horizontalBorder;
                 }
             }
 
             // Check X offset
             float contentWidth = pdfFile.getDocLen(zoom);
             if (contentWidth < getWidth()) { // whole document width visible on screen
-                offsetX = (getWidth() - contentWidth) / 2;
+                offsetX = (getWidth() - contentWidth) / 2f;
             } else {
-                if (offsetX > 0) { // left visible
-                    offsetX = 0;
-                } else if (offsetX + contentWidth < getWidth()) { // right visible
-                    offsetX = -contentWidth + getWidth();
+                float maxOffsetX = toCurrentScale((horizontalBorder * 2f) - startSpacing);
+                if (offsetX > maxOffsetX) { // left visible
+                    offsetX = maxOffsetX;
+                } else if (offsetX + contentWidth + toCurrentScale((horizontalBorder * 2f)) < getWidth()  + toCurrentScale(endSpacing)) { // right visible
+                    offsetX = -contentWidth + getWidth() + toCurrentScale(endSpacing - (horizontalBorder * 2f));
                 }
             }
 
@@ -1318,6 +1330,14 @@ public class PDFView extends RelativeLayout {
         return thumbnailRatio;
     }
 
+    public void setHorizontalBorder(int horizontalBorderDP) {
+        this.horizontalBorder = Util.getDP(getContext(), horizontalBorderDP);
+    }
+
+    public void setVerticalBorder(int verticalBorderDp) {
+        this.verticalBorder = Util.getDP(getContext(), verticalBorderDp);
+    }
+
     public boolean isSwipeVertical() {
         return swipeVertical;
     }
@@ -1548,6 +1568,8 @@ public class PDFView extends RelativeLayout {
         private boolean touchPriority = false;
         private boolean useBestQuality = false;
         private float thumbnailRatio = Constants.THUMBNAIL_RATIO;
+        private int horizontalBorder = 0;
+        private int verticalBorder = 0;
 
         private Configurator(DocumentSource documentSource) {
             this.documentSource = documentSource;
@@ -1668,8 +1690,8 @@ public class PDFView extends RelativeLayout {
             return this;
         }
 
-        public Configurator spacing(int spacing) {
-            this.pageSeparatorSpacing = spacing;
+        public Configurator pageSeparatorSpacing(int pageSeparatorSpacing) {
+            this.pageSeparatorSpacing = pageSeparatorSpacing;
             return this;
         }
 
@@ -1726,6 +1748,11 @@ public class PDFView extends RelativeLayout {
             return this;
         }
 
+        public Configurator renderDuringScale(boolean renderDuringScale) {
+            PDFView.this.renderDuringScale = renderDuringScale;
+            return this;
+        }
+
         /**
          * By default, generated bitmaps are compressed with {@link Bitmap.Config#RGB_565} format to reduce memory consumption.
          * If {@link #useBestQuality} is true, rendering will be done with {@link Bitmap.Config#ARGB_8888}.
@@ -1738,6 +1765,16 @@ public class PDFView extends RelativeLayout {
 
         public Configurator thumbnailRatio(@FloatRange(from = 0.1, to = 1.0) float thumbnailRatio) {
             this.thumbnailRatio = thumbnailRatio;
+            return this;
+        }
+
+        public Configurator horizontalBorder(int horizontalBorder) {
+            this.horizontalBorder = horizontalBorder;
+            return this;
+        }
+
+        public Configurator verticalBorder(int verticalBorder) {
+            this.verticalBorder = verticalBorder;
             return this;
         }
 
@@ -1780,6 +1817,9 @@ public class PDFView extends RelativeLayout {
             PDFView.this.setMaxZoom(maxZoom);
             PDFView.this.useBestQuality(useBestQuality);
             PDFView.this.setThumbnailRatio(thumbnailRatio);
+            PDFView.this.setHorizontalBorder(horizontalBorder);
+            PDFView.this.setVerticalBorder(verticalBorder);
+            renderDuringScale(renderDuringScale);
             setPageSeparatorSpacing(pageSeparatorSpacing);
             setStartSpacing(startSpacing);
             setEndSpacing(endSpacing);
