@@ -133,7 +133,7 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
             .enableAnnotationRendering(true)
             .onLoad(this)
             .scrollHandle(pdfScrollHandle)
-            .spacing(PDF_PAGE_SPACING_DP)
+            .pageSeparatorSpacing(PDF_PAGE_SPACING_DP)
             .startEndSpacing(START_END_SPACING_DP, START_END_SPACING_DP)
             .zoom(MIN_ZOOM, MID_ZOOM, MAX_ZOOM)
             .onPageError(this)

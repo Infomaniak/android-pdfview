@@ -61,6 +61,7 @@ class DragPinchManager implements
     private boolean scaling = false;
     private boolean enabled = false;
     private boolean hasTouchPriority = false;
+    private float startingScrollingXPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;
     private float startingTouchXPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;
     private float startingTouchYPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;
 
@@ -321,11 +322,13 @@ class DragPinchManager implements
         retVal = gestureDetector.onTouchEvent(event) || retVal;
 
         if (event.getAction() == MotionEvent.ACTION_MOVE && event.getPointerCount() >= TOUCH_POINTER_COUNT) {
+            startingScrollingXPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;
             startingTouchXPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;
             startingTouchYPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;
         }
 
         if (event.getAction() == MotionEvent.ACTION_UP && scrolling) {
+            startingScrollingXPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;
             startingTouchXPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;
             startingTouchYPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;
             scrolling = false;
@@ -347,27 +350,42 @@ class DragPinchManager implements
 
     private boolean shouldOverrideTouchPriority(View v, MotionEvent event) {
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            startingScrollingXPosition = event.getX();
             if (!v.canScrollHorizontally(DIRECTION_SCROLLING_LEFT) || !v.canScrollHorizontally(DIRECTION_SCROLLING_RIGHT)) {
                 startingTouchXPosition = event.getX();
             } else {
                 startingTouchXPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;
             }
-
             startingTouchYPosition = event.getY();
         }
 
-        boolean canScrollHorizontally =
-                v.canScrollHorizontally(DIRECTION_SCROLLING_LEFT) && v.canScrollHorizontally(DIRECTION_SCROLLING_RIGHT);
+        int scrollDirection = getScrollingDirection(event.getX());
+
+        boolean canScrollLeft = v.canScrollHorizontally(DIRECTION_SCROLLING_LEFT);
+        boolean canScrollRight = v.canScrollHorizontally(DIRECTION_SCROLLING_RIGHT);
+        boolean canScrollHorizontally = canScrollLeft && canScrollRight;
+        boolean isScrollingBlocked =
+                (!canScrollRight && scrollDirection == DIRECTION_SCROLLING_LEFT)
+                        || (!canScrollLeft && scrollDirection == DIRECTION_SCROLLING_RIGHT);
+
         if (event.getAction() == MotionEvent.ACTION_MOVE && canScrollHorizontally) {
             startingTouchXPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;
         }
 
-        if (startingTouchXPosition == STARTING_TOUCH_POSITION_NOT_INITIALIZED) {
+        if (!isScrollingBlocked || startingTouchXPosition == STARTING_TOUCH_POSITION_NOT_INITIALIZED) {
             return false;
         } else {
             float deltaX = Math.abs(event.getX() - startingTouchXPosition);
             float deltaY = Math.abs(event.getY() - startingTouchYPosition);
             return deltaX >= MIN_TRIGGER_DELTA_X_TOUCH_PRIORITY && deltaY < MIN_TRIGGER_DELTA_Y_TOUCH_PRIORITY;
+        }
+    }
+
+    private int getScrollingDirection(float x) {
+        if (x > startingScrollingXPosition) {
+            return DIRECTION_SCROLLING_RIGHT;
+        } else {
+            return DIRECTION_SCROLLING_LEFT;
         }
     }
 
