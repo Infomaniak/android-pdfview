@@ -22,7 +22,6 @@ val libMinSdk: Int by rootProject.extra
 val libCompileSdk: Int by rootProject.extra
 val libTargetSdk: Int by rootProject.extra
 val javaVersion: JavaVersion by rootProject.extra
-val versionName: String by rootProject.extra
 
 android {
     namespace = "com.infomaniak.lib.pdfview.sample"
@@ -32,7 +31,6 @@ android {
         compileSdk = libCompileSdk
         targetSdk = libTargetSdk
         versionCode = 3
-        versionName = versionName
     }
     buildFeatures { viewBinding = true }
 
