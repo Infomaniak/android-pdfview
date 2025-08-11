@@ -1,3 +1,7 @@
+## 3.2.13 (2025-08-11)
+* Update project
+* Update libs to handle 16KB pages
+
 ## 3.2.11 (2025-03-11)
 * Fix issues when swiping PDfs in a ViewPager
 * Convert build.gradle to kts and use version catalog
