@@ -20,16 +20,30 @@ Add to _build.gradle_:
 
 ```groovy
 allprojects {
-  repositories {
-    ...
-    mavenCentral()
-    ...
-  }
+    repositories {
+        ...
+        maven { url 'https://jitpack.io' }'
+        mavenCentral()
+        ...
+    }
 }
 ```
 
-`implementation 'com.github.Infomaniak:android-pdfview:3.2.11`
- 
+or _build.gradle.kts_:
+
+```kts
+dependencyResolutionManagement {
+    repositories {
+        ...
+        maven(url = "https://jitpack.io")
+        mavenCentral()
+        ...
+    }
+}
+```
+
+`implementation 'com.github.Infomaniak:android-pdfview:3.2.13`
+
 ## ProGuard
 If you are using ProGuard, add following rule to proguard config file:
 
@@ -182,7 +196,7 @@ Most important section is _Improving multiple APKs creation and versionCode hand
 You only need to do this in your application, no need for forking PdfiumAndroid or so.
 
 ### Why I cannot open PDF from URL?
-Downloading files is long running process which must be aware of Activity lifecycle, must support some configuration, 
+Downloading files is long running process which must be aware of Activity lifecycle, must support some configuration,
 data cleanup and caching, so creating such module will probably end up as new library.
 
 ### How can I show last opened page after configuration change?
@@ -210,6 +224,19 @@ You can use a combination of the following settings to get scroll and fling beha
 
 ## One more thing
 If you have any suggestions on making this lib better, write me, create issue or write some code and send pull request.
+
+## Sample Projects
+
+You can find a sample project in the [sample](https://github.com/Infomaniak/android-pdfview/tree/master/sample) folder.
+
+## Apps using the library
+
+<a href="https://github.com/Infomaniak/android-kDrive">
+    <img src="assets/infomaniak-kdrive.jpg" style="max-height: 300px; width: auto;" alt="Find App">
+</a>
+
+[Infomaniak kDrive](https://github.com/Infomaniak/android-kDrive) allows you to manage your Infomaniak files in a completely
+secure environment.
 
 ## License
 
