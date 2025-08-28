@@ -1,4 +1,4 @@
-
+/..
 #### This is a fork of the [AndroidPdfViewer](https://github.com/mhiew/AndroidPdfViewer)
 switch back to the mainline repo when it gets migrated off JCenter
 
