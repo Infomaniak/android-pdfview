@@ -16,7 +16,7 @@ androidannotations = { module = "org.androidannotations:androidannotations", ver
 appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 material = { module = "com.google.android.material:material", version.ref = "material" }
-pdfium = { module = "com.github.infomaniak:pdfiumandroid", version.ref = "pdfium" }
+pdfium = { module = "com.github.infomaniak:PdfiumAndroid", version.ref = "pdfium" }
 recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerView" }
 viewpager2 = { module = "androidx.viewpager2:viewpager2", version.ref = "viewpager2" }
 
