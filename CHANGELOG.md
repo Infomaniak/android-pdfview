@@ -1,4 +1,7 @@
-## 3.2.15 (2025-01-21)
+## 3.2.16 (2026-04-16)
+* Update pdfium to 1.9.11
+
+## 3.2.15 (2026-01-21)
 * Update project
 * Update pdfium to 1.9.10
 
