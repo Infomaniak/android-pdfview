@@ -1,12 +1,12 @@
 [versions]
-activityKtx = "1.11.0"
+activityKtx = "1.13.0"
 androidannotations = "4.8.0"
 appcompat = "1.7.1"
-coreKtx = "1.17.0"
+coreKtx = "1.18.0"
 agp = "8.13.0"
 kotlinAndroid = "2.2.20"
-material = "1.13.0"
 pdfium = "1.9.11"
+material = "1.14.0"
 recyclerView = "1.4.0"
 viewpager2 = "1.1.0"
 
