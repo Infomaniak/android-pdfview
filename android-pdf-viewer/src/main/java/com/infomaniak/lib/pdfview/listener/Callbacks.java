@@ -82,6 +82,11 @@ public class Callbacks {
      */
     private LinkHandler linkHandler;
 
+    /**
+     * Call back object to call when the user triggers an action from the text selection popup
+     */
+    private OnSelectionActionListener onSelectionActionListener;
+
     public void setOnReadyForPrinting(OnReadyForPrintingListener onReadyForPrintingListener) {
         this.onReadyForPrintingListener = onReadyForPrintingListener;
     }
@@ -216,6 +221,20 @@ public class Callbacks {
         }
     }
 
+    public void setOnSelectionActionListener(OnSelectionActionListener onSelectionActionListener) {
+        this.onSelectionActionListener = onSelectionActionListener;
+    }
+
+    public boolean hasSelectionActionListener() {
+        return onSelectionActionListener != null;
+    }
+
+    public void callOnPasteSelection(String selectedText) {
+        if (onSelectionActionListener != null) {
+            onSelectionActionListener.onPasteSelection(selectedText);
+        }
+    }
+
     public void clear() {
         // Not clearing onAttach and onDetach listeners because those are called before view initialization
         onLoadCompleteListener = null;
@@ -229,5 +248,6 @@ public class Callbacks {
         onTapListener = null;
         onLongPressListener = null;
         linkHandler = null;
+        onSelectionActionListener = null;
     }
 }

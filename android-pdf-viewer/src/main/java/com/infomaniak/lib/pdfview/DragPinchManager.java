@@ -24,6 +24,7 @@ import static com.infomaniak.lib.pdfview.util.TouchUtils.DIRECTION_SCROLLING_RIG
 
 import android.graphics.PointF;
 import android.graphics.RectF;
+import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
@@ -59,9 +60,12 @@ class DragPinchManager implements
     private final GestureDetector gestureDetector;
     private final ScaleGestureDetector scaleGestureDetector;
 
-    private boolean scrolling = false;
-    private boolean scaling = false;
-    private boolean enabled = false;
+     private boolean scrolling = false;
+     private boolean scaling = false;
+     private boolean selectingText = false;
+     private boolean draggingSelectionHandle = false;
+     private boolean draggingStartHandle = false;
+     private boolean enabled = false;
     private boolean hasTouchPriority = false;
     private float startingScrollingXPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;
     private float startingTouchXPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;
@@ -95,8 +99,19 @@ class DragPinchManager implements
         gestureDetector.setIsLongpressEnabled(false);
     }
 
+    private void setSelectionTouchPriority(boolean disallowIntercept) {
+        if (!hasTouchPriority) {
+            return;
+        }
+        TouchUtils.handleSelectionGestureTouchPriority(pdfView, disallowIntercept);
+    }
+
     @Override
     public boolean onSingleTapConfirmed(@NonNull MotionEvent e) {
+        if (pdfView.hasTextSelection()) {
+            pdfView.clearTextSelection();
+            return true;
+        }
         boolean onTapHandled = pdfView.callbacks.callOnTap(e);
         boolean linkTapped = checkLinkTapped(e.getX(), e.getY());
         if (!onTapHandled && !linkTapped) {
@@ -190,6 +205,12 @@ class DragPinchManager implements
 
     @Override
     public boolean onDown(@NonNull MotionEvent e) {
+        // Ignorer si on touche un handle de selection
+        if (pdfView.hasTextSelection()) {
+            if (pdfView.isStartHandleTouched(e.getX(), e.getY()) || pdfView.isEndHandleTouched(e.getX(), e.getY())) {
+                return false;  // Laisser le onTouch gérer les handles
+            }
+        }
         animationManager.stopFling();
         return true;
     }
@@ -206,6 +227,10 @@ class DragPinchManager implements
 
     @Override
     public boolean onScroll(MotionEvent e1, @NonNull MotionEvent e2, float distanceX, float distanceY) {
+        // Ignorer le scroll si on drag un handle de selection
+        if (draggingSelectionHandle) {
+            return true;
+        }
         scrolling = true;
         if (pdfView.isZooming() || pdfView.isSwipeEnabled()) {
             pdfView.moveRelativeTo(-distanceX, -distanceY);
@@ -224,13 +249,37 @@ class DragPinchManager implements
         }
     }
 
-    @Override
-    public void onLongPress(@NonNull MotionEvent e) {
-        pdfView.callbacks.callOnLongPress(e);
-    }
+     @Override
+     public void onLongPress(@NonNull MotionEvent e) {
+         pdfView.performLongClick();
+         // Check if touching a selection handle
+         if (pdfView.hasTextSelection()) {
+             if (pdfView.isStartHandleTouched(e.getX(), e.getY())) {
+                 draggingSelectionHandle = true;
+                 draggingStartHandle = true;
+                 setSelectionTouchPriority(true);
+                 return;
+             } else if (pdfView.isEndHandleTouched(e.getX(), e.getY())) {
+                 draggingSelectionHandle = true;
+                 draggingStartHandle = false;
+                 setSelectionTouchPriority(true);
+                 return;
+             }
+         }
+         if (pdfView.isTextSelectionEnabled() && pdfView.startTextSelection(e.getX(), e.getY())) {
+             selectingText = true;
+             setSelectionTouchPriority(true);
+             return;
+         }
+         pdfView.callbacks.callOnLongPress(e);
+     }
 
     @Override
     public boolean onFling(MotionEvent e1, @NonNull MotionEvent e2, float velocityX, float velocityY) {
+        // Ignorer le fling si on drag un handle de selection
+        if (draggingSelectionHandle) {
+            return true;
+        }
         if (!pdfView.isSwipeEnabled()) {
             return false;
         }
@@ -316,12 +365,62 @@ class DragPinchManager implements
 
     @Override
     public boolean onTouch(View v, MotionEvent event) {
-        if (!enabled) {
-            return false;
-        }
+         if (!enabled) {
+             return false;
+         }
 
-        boolean retVal = scaleGestureDetector.onTouchEvent(event);
-        retVal = gestureDetector.onTouchEvent(event) || retVal;
+         // Check for handle dragging on ACTION_DOWN
+         if (event.getAction() == MotionEvent.ACTION_DOWN) {
+             if (pdfView.hasTextSelection()) {
+                 if (pdfView.isStartHandleTouched(event.getX(), event.getY())) {
+                     draggingSelectionHandle = true;
+                     draggingStartHandle = true;
+                      setSelectionTouchPriority(true);
+                     return true;
+                 } else if (pdfView.isEndHandleTouched(event.getX(), event.getY())) {
+                     draggingSelectionHandle = true;
+                     draggingStartHandle = false;
+                      setSelectionTouchPriority(true);
+                     return true;
+                 }
+             }
+         }
+
+         if (draggingSelectionHandle) {
+             if (event.getAction() == MotionEvent.ACTION_MOVE) {
+                  setSelectionTouchPriority(true);
+                 if (draggingStartHandle) {
+                     pdfView.extendSelectionFromStart(event.getX(), event.getY());
+                 } else {
+                     pdfView.extendSelectionFromEnd(event.getX(), event.getY());
+                 }
+                 return true;
+             }
+             if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+                 draggingSelectionHandle = false;
+                 draggingStartHandle = false;
+                  setSelectionTouchPriority(false);
+                 pdfView.finishTextSelection();
+                 return true;
+             }
+         }
+
+         if (selectingText) {
+             if (event.getAction() == MotionEvent.ACTION_MOVE) {
+                  setSelectionTouchPriority(true);
+                 pdfView.updateTextSelection(event.getX(), event.getY());
+                 return true;
+             }
+             if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
+                 selectingText = false;
+                  setSelectionTouchPriority(false);
+                 pdfView.finishTextSelection();
+                 return true;
+             }
+         }
+
+         boolean retVal = scaleGestureDetector.onTouchEvent(event);
+         retVal = gestureDetector.onTouchEvent(event) || retVal;
 
         if (event.getAction() == MotionEvent.ACTION_MOVE && event.getPointerCount() >= TOUCH_POINTER_COUNT) {
             startingScrollingXPosition = STARTING_TOUCH_POSITION_NOT_INITIALIZED;

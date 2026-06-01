@@ -71,6 +71,18 @@ public class TouchUtils {
         }
     }
 
+    public static void handleSelectionGestureTouchPriority(View view, boolean disallowIntercept) {
+        ViewParent recyclerViewParent = getViewToDisableTouch(view);
+        if (recyclerViewParent != null) {
+            recyclerViewParent.requestDisallowInterceptTouchEvent(disallowIntercept);
+        }
+
+        ViewParent viewPagerParent = getViewPager(view);
+        if (viewPagerParent != null) {
+            viewPagerParent.requestDisallowInterceptTouchEvent(disallowIntercept);
+        }
+    }
+
     private static ViewParent getViewToDisableTouch(View startingView) {
         ViewParent parentView = startingView.getParent();
 

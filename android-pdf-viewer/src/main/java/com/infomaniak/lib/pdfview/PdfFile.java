@@ -353,6 +353,79 @@ class PdfFile {
         return pdfiumCore.mapRectToDevice(pdfDocument, docPage, startX, startY, sizeX, sizeY, 0, rect);
     }
 
+    public Size getOriginalPageSize(int pageIndex) {
+        int docPage = documentPage(pageIndex);
+        if (docPage < 0) {
+            return new Size(0, 0);
+        }
+        return originalPageSizes.get(pageIndex);
+    }
+
+    public int getPageTextCount(int pageIndex) {
+        int docPage = documentPage(pageIndex);
+        if (docPage < 0) {
+            return 0;
+        }
+        try {
+            openPage(pageIndex);
+        } catch (PageRenderingException ignored) {
+            return 0;
+        }
+        return pdfiumCore.getPageTextCount(pdfDocument, docPage);
+    }
+
+    public String getPageText(int pageIndex) {
+        int docPage = documentPage(pageIndex);
+        if (docPage < 0) {
+            return "";
+        }
+        try {
+            openPage(pageIndex);
+        } catch (PageRenderingException ignored) {
+            return "";
+        }
+        return pdfiumCore.getPageText(pdfDocument, docPage);
+    }
+
+    public String getPageText(int pageIndex, int start, int count) {
+        int docPage = documentPage(pageIndex);
+        if (docPage < 0 || count <= 0) {
+            return "";
+        }
+        try {
+            openPage(pageIndex);
+        } catch (PageRenderingException ignored) {
+            return "";
+        }
+        return pdfiumCore.getPageText(pdfDocument, docPage, start, count);
+    }
+
+    public int getCharIndexAtCoord(int pageIndex, double pageX, double pageY, double toleranceX, double toleranceY) {
+        int docPage = documentPage(pageIndex);
+        if (docPage < 0) {
+            return -1;
+        }
+        try {
+            openPage(pageIndex);
+        } catch (PageRenderingException ignored) {
+            return -1;
+        }
+        return pdfiumCore.getCharIndexAtCoord(pdfDocument, docPage, pageX, pageY, toleranceX, toleranceY);
+    }
+
+    public RectF getCharBox(int pageIndex, int charIndex) {
+        int docPage = documentPage(pageIndex);
+        if (docPage < 0 || charIndex < 0) {
+            return null;
+        }
+        try {
+            openPage(pageIndex);
+        } catch (PageRenderingException ignored) {
+            return null;
+        }
+        return pdfiumCore.getCharBox(pdfDocument, docPage, charIndex);
+    }
+
     public void dispose() {
         if (pdfiumCore != null && pdfDocument != null) {
             pdfiumCore.closeDocument(pdfDocument);
