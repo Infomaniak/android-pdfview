@@ -137,6 +137,10 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
             .onPageError(this)
             .pageFitPolicy(FitPolicy.BOTH)
             .password(password)
+            .enableTextSelection(true)
+            .onSelectionAction { selectedText ->
+                Toast.makeText(this, selectedText, Toast.LENGTH_SHORT).show()
+            }
             .load()
     }
 
