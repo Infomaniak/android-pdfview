@@ -102,6 +102,7 @@ pdfView.fromAsset(String)
     .pageSnap(false) // snap pages to screen boundaries
     .pageFling(false) // make a fling change only a single page like ViewPager
     .nightMode(false) // toggle night mode
+    .enableTextSelection(false) // long press + drag to select text on a single page
     .load();
 ```
 
@@ -155,6 +156,17 @@ and clicking on link that targets some URI causes opening it in default applicat
 You can also create custom link handlers, just implement **LinkHandler** interface and set it using
 `Configurator#linkHandler(LinkHandler)` method. Take a look at [DefaultLinkHandler](https://github.com/barteksc/AndroidPdfViewer/tree/master/android-pdf-viewer/src/main/java/com/github/barteksc/pdfviewer/link/DefaultLinkHandler.java)
 source to implement custom behavior.
+
+## Text selection
+
+Text selection can be enabled with `Configurator#enableTextSelection(true)`.
+
+- Long press on text to start selection
+- Drag your finger to extend/reduce the selection
+- A small popup is displayed near the selection with a `Copy` action
+- Receive the selected text when that action is tapped with `Configurator#onSelectionAction(...)`
+- Read selected text with `PDFView#getSelectedText()`
+- Clear current selection with `PDFView#clearTextSelection()`
 
 ## Pages fit policy
 Since version 3.0.0, library supports fitting pages into the screen in 3 modes:
