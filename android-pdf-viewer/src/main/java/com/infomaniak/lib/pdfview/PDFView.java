@@ -40,6 +40,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.PopupWindow;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
@@ -236,6 +237,10 @@ public class PDFView extends RelativeLayout {
      private RectF selectionEndHandleBounds = null;
      private String selectedText = "";
      private PopupWindow selectionActionPopup;
+     private boolean allowSelectionActionPopupAutoShow = false;
+     private final Rect popupVisibleRect = new Rect();
+     private final ViewTreeObserver.OnScrollChangedListener selectionPopupScrollChangedListener = this::syncSelectionActionPopupWithViewVisibility;
+     private final ViewTreeObserver.OnGlobalLayoutListener selectionPopupGlobalLayoutListener = this::syncSelectionActionPopupWithViewVisibility;
 
     private int defaultPage = 0;
 
@@ -601,11 +606,34 @@ public class PDFView extends RelativeLayout {
         if (renderingHandlerThread == null) {
             renderingHandlerThread = new HandlerThread("PDF renderer");
         }
+        ViewTreeObserver observer = getViewTreeObserver();
+        if (observer.isAlive()) {
+            observer.addOnScrollChangedListener(selectionPopupScrollChangedListener);
+            observer.addOnGlobalLayoutListener(selectionPopupGlobalLayoutListener);
+        }
+        syncSelectionActionPopupWithViewVisibility();
+    }
+
+    @Override
+    protected void onVisibilityChanged(View changedView, int visibility) {
+        super.onVisibilityChanged(changedView, visibility);
+        syncSelectionActionPopupWithViewVisibility();
+    }
+
+    @Override
+    protected void onWindowVisibilityChanged(int visibility) {
+        super.onWindowVisibilityChanged(visibility);
+        syncSelectionActionPopupWithViewVisibility();
     }
 
     @Override
     protected void onDetachedFromWindow() {
         callbacks.callOnDetachComplete();
+        ViewTreeObserver observer = getViewTreeObserver();
+        if (observer.isAlive()) {
+            observer.removeOnScrollChangedListener(selectionPopupScrollChangedListener);
+            observer.removeOnGlobalLayoutListener(selectionPopupGlobalLayoutListener);
+        }
         recycle();
         if (renderingHandlerThread != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
@@ -1258,7 +1286,7 @@ public class PDFView extends RelativeLayout {
         callbacks.callOnPageScroll(getCurrentPage(), positionOffset);
 
         if (offsetsChanged) {
-            updateSelectionActionPopupPosition();
+            syncSelectionActionPopupWithViewVisibility();
         }
 
         redraw();
@@ -1777,6 +1805,7 @@ public class PDFView extends RelativeLayout {
             return false;
         }
 
+        allowSelectionActionPopupAutoShow = false;
         dismissSelectionActionPopup();
 
         SelectionHit hit = getSelectionHit(x, y);
@@ -1814,11 +1843,13 @@ public class PDFView extends RelativeLayout {
     void finishTextSelection() {
         if (hasTextSelection()) {
             selectedText = computeSelectedText();
+            allowSelectionActionPopupAutoShow = true;
             showSelectionActionPopup();
         }
     }
 
     private void clearTextSelectionInternal(boolean redraw) {
+        allowSelectionActionPopupAutoShow = false;
         dismissSelectionActionPopup();
         selectionPage = -1;
         selectionStart = INVALID_CHAR_INDEX;
@@ -1864,6 +1895,9 @@ public class PDFView extends RelativeLayout {
         int popupWidth = actionView.getMeasuredWidth();
         int popupHeight = actionView.getMeasuredHeight();
         int[] popupLocation = computeSelectionPopupLocation(anchorBounds, popupWidth, popupHeight);
+        if (popupLocation == null) {
+            return;
+        }
 
         selectionActionPopup = popupWindow;
         popupWindow.setOnDismissListener(() -> {
@@ -1895,6 +1929,7 @@ public class PDFView extends RelativeLayout {
         actionView.setBackground(background);
         actionView.setOnClickListener(v -> {
             callbacks.callOnPasteSelection(selectedText);
+            allowSelectionActionPopupAutoShow = false;
             dismissSelectionActionPopup();
         });
         return actionView;
@@ -1922,7 +1957,33 @@ public class PDFView extends RelativeLayout {
         int popupWidth = contentView.getMeasuredWidth();
         int popupHeight = contentView.getMeasuredHeight();
         int[] popupLocation = computeSelectionPopupLocation(anchorBounds, popupWidth, popupHeight);
+        if (popupLocation == null) {
+            dismissSelectionActionPopup();
+            return;
+        }
         selectionActionPopup.update(popupLocation[0], popupLocation[1], -1, -1);
+    }
+
+    private void syncSelectionActionPopupWithViewVisibility() {
+        if (!hasTextSelection() || selectedText.isEmpty() || !callbacks.hasSelectionActionListener()) {
+            allowSelectionActionPopupAutoShow = false;
+            dismissSelectionActionPopup();
+            return;
+        }
+
+        if (!isShown() || !getGlobalVisibleRect(popupVisibleRect)) {
+            dismissSelectionActionPopup();
+            return;
+        }
+
+        if (selectionActionPopup == null || !selectionActionPopup.isShowing()) {
+            if (allowSelectionActionPopupAutoShow) {
+                showSelectionActionPopup();
+            }
+            return;
+        }
+
+        updateSelectionActionPopupPosition();
     }
 
     private int[] computeSelectionPopupLocation(RectF anchorBounds, int popupWidth, int popupHeight) {
@@ -1932,13 +1993,14 @@ public class PDFView extends RelativeLayout {
         float anchorCenterX = anchorBounds.centerX();
         int popupX = location[0] + Math.round(anchorCenterX - popupWidth / 2f);
         int popupY = location[1] + Math.round(anchorBounds.top - popupHeight - margin);
-        if (popupY < location[1]) {
-            popupY = location[1] + Math.round(anchorBounds.bottom + margin);
-        }
 
         int minX = location[0] + margin;
-        int maxX = location[0] + Math.max(margin, getWidth() - popupWidth - margin);
-        popupX = Math.max(minX, Math.min(popupX, maxX));
+        int maxX = location[0] + getWidth() - popupWidth - margin;
+        int minY = location[1] + margin;
+        int maxY = location[1] + getHeight() - popupHeight - margin;
+        if (popupX < minX || popupX > maxX || popupY < minY || popupY > maxY) {
+            return null;
+        }
         return new int[]{popupX, popupY};
     }
 
@@ -1970,11 +2032,9 @@ public class PDFView extends RelativeLayout {
             return null;
         }
 
-        RectF anchor = lineRects.get(0);
-        for (RectF lineRect : lineRects) {
-            if (lineRect.top < anchor.top || (lineRect.top == anchor.top && lineRect.left < anchor.left)) {
-                anchor = lineRect;
-            }
+        RectF anchor = new RectF(lineRects.get(0));
+        for (int i = 1; i < lineRects.size(); i++) {
+            anchor.union(lineRects.get(i));
         }
         return new RectF(anchor.left + currentXOffset, anchor.top + currentYOffset, anchor.right + currentXOffset, anchor.bottom + currentYOffset);
     }
