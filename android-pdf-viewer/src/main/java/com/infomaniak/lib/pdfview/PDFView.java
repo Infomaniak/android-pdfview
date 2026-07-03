@@ -1,18 +1,19 @@
 /*
- * Infomaniak PDF Viewer - Android
- * Copyright (C) 2025 Infomaniak Network SA
+ * Infomaniak android-pdf-viewer
+ * Copyright (C) 2025-2026 Infomaniak Network SA
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package com.infomaniak.lib.pdfview;
 
@@ -110,17 +111,17 @@ import java.util.List;
  */
 public class PDFView extends RelativeLayout {
 
-     private static final String TAG = PDFView.class.getSimpleName();
-     private static final int INVALID_CHAR_INDEX = -1;
-     private static final float MAX_FALLBACK_CHAR_DISTANCE_SQ = 400f;
-     private static final float MAX_FALLBACK_DEVICE_DISTANCE_SQ = 900f;
-        private static final float SELECTION_HANDLE_RADIUS = 40f;
-        private static final float SELECTION_HANDLE_TOUCH_RADIUS = 64f;
-     private static final int SELECTION_POPUP_MARGIN_DP = 8;
-     private static final int SELECTION_POPUP_HORIZONTAL_PADDING_DP = 16;
-     private static final int SELECTION_POPUP_VERTICAL_PADDING_DP = 10;
-     private static final int SELECTION_POPUP_CORNER_RADIUS_DP = 12;
-     private static final int SELECTION_POPUP_ELEVATION_DP = 6;
+    private static final String TAG = PDFView.class.getSimpleName();
+    private static final int INVALID_CHAR_INDEX = -1;
+    private static final float MAX_FALLBACK_CHAR_DISTANCE_SQ = 400f;
+    private static final float MAX_FALLBACK_DEVICE_DISTANCE_SQ = 900f;
+    private static final float SELECTION_HANDLE_RADIUS = 40f;
+    private static final float SELECTION_HANDLE_TOUCH_RADIUS = 64f;
+    private static final int SELECTION_POPUP_MARGIN_DP = 8;
+    private static final int SELECTION_POPUP_HORIZONTAL_PADDING_DP = 16;
+    private static final int SELECTION_POPUP_VERTICAL_PADDING_DP = 10;
+    private static final int SELECTION_POPUP_CORNER_RADIUS_DP = 12;
+    private static final int SELECTION_POPUP_ELEVATION_DP = 6;
 
     public static final float DEFAULT_MAX_SCALE = 3.0f;
     public static final float DEFAULT_MID_SCALE = 1.75f;
