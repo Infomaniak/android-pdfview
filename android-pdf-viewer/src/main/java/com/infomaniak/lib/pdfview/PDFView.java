@@ -945,7 +945,7 @@ public class PDFView extends RelativeLayout {
             return lineRects;
         }
 
-        // Collecter tous les rectangles mapped de chaque caractère
+        // Collect all mapped rectangles for each character
         java.util.List<RectF> mappedBoxes = new java.util.ArrayList<>();
         for (int charIndex = start; charIndex <= end; charIndex++) {
             RectF charBox = pdfFile.getCharBox(page, charIndex);
@@ -963,13 +963,13 @@ public class PDFView extends RelativeLayout {
             return lineRects;
         }
 
-        // Trier par X pour traiter les caractères dans l'ordre de lecture
+        // Sort by X to process characters in reading order
         Collections.sort(mappedBoxes, (a, b) -> Float.compare(a.centerX(), b.centerX()));
 
         // Estimer le seuil de distance Y
         float lineGapThreshold = estimateLineGapThreshold(mappedBoxes);
 
-        // Grouper par ligne en utilisant le chevauchement/proximité en Y
+        // Group by line using Y overlap/proximity
         java.util.List<java.util.List<RectF>> lineGroups = new java.util.ArrayList<>();
         for (RectF box : mappedBoxes) {
             boolean added = false;
@@ -987,7 +987,7 @@ public class PDFView extends RelativeLayout {
             }
         }
 
-        // Créer un rectangle continu par ligne
+        // Create a continuous rectangle per line
         for (java.util.List<RectF> group : lineGroups) {
             float minLeft = Float.MAX_VALUE;
             float maxRight = Float.MIN_VALUE;
@@ -1009,7 +1009,7 @@ public class PDFView extends RelativeLayout {
 
     private boolean isOnSameLine(java.util.List<RectF> group, RectF newBox, float threshold) {
         for (RectF existing : group) {
-            // Vérifier le chevauchement en Y ou proximité
+             // Check Y overlap or proximity
             float gap = computeYGap(existing, newBox);
             if (gap <= threshold) {
                 return true;
@@ -1019,11 +1019,11 @@ public class PDFView extends RelativeLayout {
     }
 
     private float computeYGap(RectF box1, RectF box2) {
-        // Si les boîtes se chevauchent en Y, pas de gap
+         // If boxes overlap in Y, no gap
         if (box1.bottom >= box2.top && box1.top <= box2.bottom) {
             return 0;
         }
-        // Sinon, distance entre les boîtes
+         // Otherwise, distance between boxes
         if (box1.bottom < box2.top) {
             return box2.top - box1.bottom;
         } else {
@@ -1035,7 +1035,7 @@ public class PDFView extends RelativeLayout {
          if (boxes.size() < 2) {
              return 5f;
          }
-         // Estimer la hauteur moyenne des caractères
+         // Estimate average character height
          float totalHeight = 0f;
          for (RectF box : boxes) {
              totalHeight += box.height();
