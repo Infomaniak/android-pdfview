@@ -920,15 +920,9 @@ public class PDFView extends RelativeLayout {
         }
 
         SizeF pageSize = pdfFile.getScaledPageSize(page, zoom);
-        int pageX;
-        int pageY;
-        if (swipeVertical) {
-            pageX = (int) pdfFile.getSecondaryPageOffset(page, zoom);
-            pageY = (int) pdfFile.getPageOffset(page, zoom);
-        } else {
-            pageY = (int) pdfFile.getSecondaryPageOffset(page, zoom);
-            pageX = (int) pdfFile.getPageOffset(page, zoom);
-        }
+        PageOffsets offsets = computePageOffsets(page);
+        int pageX = offsets.x;
+        int pageY = offsets.y;
 
         int start = Math.min(selectionStart, selectionEnd);
         int end = Math.max(selectionStart, selectionEnd);
@@ -1058,15 +1052,9 @@ public class PDFView extends RelativeLayout {
           }
 
           SizeF pageSize = pdfFile.getScaledPageSize(page, zoom);
-          int pageX;
-          int pageY;
-          if (swipeVertical) {
-              pageX = (int) pdfFile.getSecondaryPageOffset(page, zoom);
-              pageY = (int) pdfFile.getPageOffset(page, zoom);
-          } else {
-              pageY = (int) pdfFile.getSecondaryPageOffset(page, zoom);
-              pageX = (int) pdfFile.getPageOffset(page, zoom);
-          }
+          PageOffsets offsets = computePageOffsets(page);
+          int pageX = offsets.x;
+          int pageY = offsets.y;
 
          int start = Math.min(selectionStart, selectionEnd);
          int end = Math.max(selectionStart, selectionEnd);
@@ -2153,15 +2141,9 @@ public class PDFView extends RelativeLayout {
         if (scaledPageSize.getWidth() <= 0 || scaledPageSize.getHeight() <= 0) {
             return null;
         }
-        float pageLeft;
-        float pageTop;
-        if (swipeVertical) {
-            pageLeft = pdfFile.getSecondaryPageOffset(page, zoom);
-            pageTop = pdfFile.getPageOffset(page, zoom);
-        } else {
-            pageTop = pdfFile.getSecondaryPageOffset(page, zoom);
-            pageLeft = pdfFile.getPageOffset(page, zoom);
-        }
+        PageOffsets offsets = computePageOffsets(page);
+        float pageLeft = offsets.x;
+        float pageTop = offsets.y;
 
         int pageX = (int) pageLeft;
         int pageY = (int) pageTop;
@@ -2272,6 +2254,29 @@ public class PDFView extends RelativeLayout {
             return INVALID_CHAR_INDEX;
         }
         return bestIndex;
+    }
+
+    private static class PageOffsets {
+        final int x;
+        final int y;
+
+        PageOffsets(int x, int y) {
+            this.x = x;
+            this.y = y;
+        }
+    }
+
+    private PageOffsets computePageOffsets(int page) {
+        int pageX;
+        int pageY;
+        if (swipeVertical) {
+            pageX = (int) pdfFile.getSecondaryPageOffset(page, zoom);
+            pageY = (int) pdfFile.getPageOffset(page, zoom);
+        } else {
+            pageY = (int) pdfFile.getSecondaryPageOffset(page, zoom);
+            pageX = (int) pdfFile.getPageOffset(page, zoom);
+        }
+        return new PageOffsets(pageX, pageY);
     }
 
     private static class SelectionHit {
