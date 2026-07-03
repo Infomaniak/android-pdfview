@@ -1787,7 +1787,7 @@ public class PDFView extends RelativeLayout {
      */
     public void copySelection() {
         if (hasTextSelection() && !selectedText.isEmpty()) {
-            callbacks.callOnPasteSelection(selectedText);
+            callbacks.callOnCopySelection(selectedText);
         }
     }
 
@@ -1988,7 +1988,7 @@ public class PDFView extends RelativeLayout {
         background.setCornerRadius(Util.getDP(getContext(), SELECTION_POPUP_CORNER_RADIUS_DP));
         actionView.setBackground(background);
         actionView.setOnClickListener(v -> {
-            callbacks.callOnPasteSelection(selectedText);
+            callbacks.callOnCopySelection(selectedText);
             allowSelectionActionPopupAutoShow = false;
             dismissSelectionActionPopup();
         });

@@ -235,9 +235,9 @@ public class Callbacks {
         return onSelectionActionListener != null;
     }
 
-    public void callOnPasteSelection(String selectedText) {
+    public void callOnCopySelection(String selectedText) {
         if (onSelectionActionListener != null) {
-            onSelectionActionListener.onPasteSelection(selectedText);
+            onSelectionActionListener.onCopySelection(selectedText);
         }
     }
 

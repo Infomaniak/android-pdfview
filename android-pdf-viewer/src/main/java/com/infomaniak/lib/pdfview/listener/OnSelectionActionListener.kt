@@ -18,5 +18,5 @@
 package com.infomaniak.lib.pdfview.listener
 
 fun interface OnSelectionActionListener {
-    fun onPasteSelection(selectedText: String)
+    fun onCopySelection(selectedText: String)
 }
