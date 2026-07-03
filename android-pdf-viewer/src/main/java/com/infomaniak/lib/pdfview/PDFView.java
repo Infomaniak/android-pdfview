@@ -64,6 +64,7 @@ import com.infomaniak.lib.pdfview.listener.OnPageScrollListener;
 import com.infomaniak.lib.pdfview.listener.OnReadyForPrintingListener;
 import com.infomaniak.lib.pdfview.listener.OnRenderListener;
 import com.infomaniak.lib.pdfview.listener.OnSelectionActionListener;
+import com.infomaniak.lib.pdfview.listener.OnSelectionChangeListener;
 import com.infomaniak.lib.pdfview.listener.OnTapListener;
 import com.infomaniak.lib.pdfview.model.PagePart;
 import com.infomaniak.lib.pdfview.scroll.ScrollHandle;
@@ -231,6 +232,7 @@ public class PDFView extends RelativeLayout {
     private boolean fitEachPage = false;
 
      private boolean textSelectionEnabled = false;
+     private boolean selectionPopupEnabled = true;
      private int selectionHandleColor = 0xFF2196F3;
      private int selectionHighlightColor = 0x6633B5E5;
      private int selectionPopupBackgroundColor = 0xFF323232;
@@ -1770,6 +1772,25 @@ public class PDFView extends RelativeLayout {
         selectionPopupText = text;
     }
 
+    public void setSelectionPopupEnabled(boolean enabled) {
+        selectionPopupEnabled = enabled;
+        if (!enabled) {
+            dismissSelectionActionPopup();
+        }
+    }
+
+    /**
+     * Programmatically triggers the selection action (equivalent to tapping the popup button).
+     * Does nothing if there is no active text selection.
+     * Can be used when {@link #setSelectionPopupEnabled(boolean)} is false and the host app
+     * provides its own copy/paste UI.
+     */
+    public void copySelection() {
+        if (hasTextSelection() && !selectedText.isEmpty()) {
+            callbacks.callOnPasteSelection(selectedText);
+        }
+    }
+
     public boolean hasTextSelection() {
         return selectionPage >= 0 && selectionStart >= 0 && selectionEnd >= 0;
     }
@@ -1845,6 +1866,7 @@ public class PDFView extends RelativeLayout {
         selectionStart = hit.charIndex;
         selectionEnd = hit.charIndex;
         selectedText = computeSelectedText();
+        callbacks.callOnSelectionChanged(true);
         redraw();
         return true;
     }
@@ -1871,20 +1893,26 @@ public class PDFView extends RelativeLayout {
     void finishTextSelection() {
         if (hasTextSelection()) {
             selectedText = computeSelectedText();
-            allowSelectionActionPopupAutoShow = true;
-            showSelectionActionPopup();
+            if (selectionPopupEnabled) {
+                allowSelectionActionPopupAutoShow = true;
+                showSelectionActionPopup();
+            }
         }
     }
 
     private void clearTextSelectionInternal(boolean redraw) {
         allowSelectionActionPopupAutoShow = false;
         dismissSelectionActionPopup();
+        boolean hadSelection = hasTextSelection();
         selectionPage = -1;
         selectionStart = INVALID_CHAR_INDEX;
         selectionEnd = INVALID_CHAR_INDEX;
         selectionStartHandleBounds = null;
         selectionEndHandleBounds = null;
         selectedText = "";
+        if (hadSelection) {
+            callbacks.callOnSelectionChanged(false);
+        }
         if (redraw) {
             redraw();
         }
@@ -2355,7 +2383,9 @@ public class PDFView extends RelativeLayout {
 
         private boolean nightMode = false;
         private boolean textSelectionEnabled = false;
+        private boolean selectionPopupEnabled = true;
         private OnSelectionActionListener onSelectionActionListener;
+        private OnSelectionChangeListener onSelectionChangeListener;
         private Integer selectionHandleColor = null;
         private Integer selectionHighlightColor = null;
         private Integer selectionPopupBackgroundColor = null;
@@ -2544,6 +2574,16 @@ public class PDFView extends RelativeLayout {
             return this;
         }
 
+        public Configurator onSelectionChange(OnSelectionChangeListener onSelectionChangeListener) {
+            this.onSelectionChangeListener = onSelectionChangeListener;
+            return this;
+        }
+
+        public Configurator selectionPopupEnabled(boolean selectionPopupEnabled) {
+            this.selectionPopupEnabled = selectionPopupEnabled;
+            return this;
+        }
+
         public Configurator selectionHandleColor(@ColorInt int color) {
             this.selectionHandleColor = color;
             return this;
@@ -2630,9 +2670,11 @@ public class PDFView extends RelativeLayout {
             PDFView.this.callbacks.setOnPageError(onPageErrorListener);
             PDFView.this.callbacks.setLinkHandler(linkHandler);
             PDFView.this.callbacks.setOnSelectionActionListener(onSelectionActionListener);
+            PDFView.this.callbacks.setOnSelectionChangeListener(onSelectionChangeListener);
             PDFView.this.setSwipeEnabled(enableSwipe);
             PDFView.this.setNightMode(nightMode);
             PDFView.this.enableTextSelection(textSelectionEnabled);
+            PDFView.this.setSelectionPopupEnabled(selectionPopupEnabled);
             if (selectionHandleColor != null) PDFView.this.setSelectionHandleColor(selectionHandleColor);
             if (selectionHighlightColor != null) PDFView.this.setSelectionHighlightColor(selectionHighlightColor);
             if (selectionPopupBackgroundColor != null) PDFView.this.setSelectionPopupBackgroundColor(selectionPopupBackgroundColor);
