@@ -1878,7 +1878,7 @@ public class PDFView extends RelativeLayout {
         }
 
         RectF anchorBounds = getSelectionPopupAnchorBounds();
-        if (anchorBounds == null) {
+        if (anchorBounds == null || !isSelectionAnchorVisibleOnScreen(anchorBounds)) {
             return;
         }
 
@@ -1944,7 +1944,7 @@ public class PDFView extends RelativeLayout {
             return;
         }
         RectF anchorBounds = getSelectionPopupAnchorBounds();
-        if (anchorBounds == null) {
+        if (anchorBounds == null || !isSelectionAnchorVisibleOnScreen(anchorBounds)) {
             dismissSelectionActionPopup();
             return;
         }
@@ -1976,6 +1976,12 @@ public class PDFView extends RelativeLayout {
             return;
         }
 
+        RectF anchorBounds = getSelectionPopupAnchorBounds();
+        if (anchorBounds == null || !isSelectionAnchorVisibleOnScreen(anchorBounds)) {
+            dismissSelectionActionPopup();
+            return;
+        }
+
         if (selectionActionPopup == null || !selectionActionPopup.isShowing()) {
             if (allowSelectionActionPopupAutoShow) {
                 showSelectionActionPopup();
@@ -1991,17 +1997,41 @@ public class PDFView extends RelativeLayout {
         int[] location = new int[2];
         getLocationOnScreen(location);
         float anchorCenterX = anchorBounds.centerX();
-        int popupX = location[0] + Math.round(anchorCenterX - popupWidth / 2f);
-        int popupY = location[1] + Math.round(anchorBounds.top - popupHeight - margin);
+        int desiredX = location[0] + Math.round(anchorCenterX - popupWidth / 2f);
+        int desiredY = location[1] + Math.round(anchorBounds.top - popupHeight - margin);
 
         int minX = location[0] + margin;
         int maxX = location[0] + getWidth() - popupWidth - margin;
         int minY = location[1] + margin;
         int maxY = location[1] + getHeight() - popupHeight - margin;
-        if (popupX < minX || popupX > maxX || popupY < minY || popupY > maxY) {
-            return null;
+
+        int popupX;
+        if (maxX < minX) {
+            popupX = location[0] + Math.round((getWidth() - popupWidth) / 2f);
+        } else {
+            popupX = Math.max(minX, Math.min(desiredX, maxX));
         }
+
+        int popupY;
+        if (maxY < minY) {
+            popupY = location[1] + Math.round((getHeight() - popupHeight) / 2f);
+        } else {
+            popupY = Math.max(minY, Math.min(desiredY, maxY));
+        }
+
         return new int[]{popupX, popupY};
+    }
+
+    private boolean isSelectionAnchorVisibleOnScreen(RectF anchorBounds) {
+        if (anchorBounds == null || !getGlobalVisibleRect(popupVisibleRect)) {
+            return false;
+        }
+        int[] location = new int[2];
+        getLocationOnScreen(location);
+        RectF anchorOnScreen = new RectF(anchorBounds);
+        anchorOnScreen.offset(location[0], location[1]);
+        RectF visibleRect = new RectF(popupVisibleRect);
+        return RectF.intersects(anchorOnScreen, visibleRect);
     }
 
     private RectF getSelectionPopupAnchorBounds() {
