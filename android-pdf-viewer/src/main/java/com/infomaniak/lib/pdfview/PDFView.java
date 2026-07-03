@@ -2213,11 +2213,14 @@ public class PDFView extends RelativeLayout {
             if (charBox == null) {
                 continue;
             }
-            RectF mappedRect = pdfFile.mapRectToDevice(page, pageX, pageY, (int) pageSize.getWidth(), (int) pageSize.getHeight(), charBox);
-            mappedRect.sort();
-            if (mappedRect.contains(mappedX, mappedY)) {
-                return i;
-            }
+             RectF mappedRect = pdfFile.mapRectToDevice(page, pageX, pageY, (int) pageSize.getWidth(), (int) pageSize.getHeight(), charBox);
+             if (mappedRect == null) {
+                 continue;
+             }
+             mappedRect.sort();
+             if (mappedRect.contains(mappedX, mappedY)) {
+                 return i;
+             }
             float centerX = (mappedRect.left + mappedRect.right) / 2f;
             float centerY = (mappedRect.top + mappedRect.bottom) / 2f;
             float dx = centerX - mappedX;
