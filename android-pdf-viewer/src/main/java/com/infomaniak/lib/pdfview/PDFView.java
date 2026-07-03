@@ -1044,21 +1044,28 @@ public class PDFView extends RelativeLayout {
          return avgHeight * 0.3f;
      }
 
-     private void drawSelectionHandles(Canvas canvas) {
-         selectionStartHandleBounds = null;
-         selectionEndHandleBounds = null;
-         if (!hasTextSelection() || pdfFile == null) {
-             return;
-         }
+      private void drawSelectionHandles(Canvas canvas) {
+          selectionStartHandleBounds = null;
+          selectionEndHandleBounds = null;
+          if (!hasTextSelection() || pdfFile == null) {
+              return;
+          }
 
-         int page = selectionPage;
-         if (page < 0 || page >= pdfFile.getPagesCount()) {
-             return;
-         }
+          int page = selectionPage;
+          if (page < 0 || page >= pdfFile.getPagesCount()) {
+              return;
+          }
 
-         SizeF pageSize = pdfFile.getScaledPageSize(page, zoom);
-         int pageX = (int) pdfFile.getSecondaryPageOffset(page, zoom);
-         int pageY = (int) pdfFile.getPageOffset(page, zoom);
+          SizeF pageSize = pdfFile.getScaledPageSize(page, zoom);
+          int pageX;
+          int pageY;
+          if (swipeVertical) {
+              pageX = (int) pdfFile.getSecondaryPageOffset(page, zoom);
+              pageY = (int) pdfFile.getPageOffset(page, zoom);
+          } else {
+              pageY = (int) pdfFile.getSecondaryPageOffset(page, zoom);
+              pageX = (int) pdfFile.getPageOffset(page, zoom);
+          }
 
          int start = Math.min(selectionStart, selectionEnd);
          int end = Math.max(selectionStart, selectionEnd);
