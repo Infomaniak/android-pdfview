@@ -45,6 +45,7 @@ import android.widget.PopupWindow;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import androidx.annotation.ColorInt;
 import androidx.annotation.FloatRange;
 
 import com.infomaniak.lib.pdfview.exception.PageRenderingException;
@@ -112,8 +113,8 @@ public class PDFView extends RelativeLayout {
      private static final int INVALID_CHAR_INDEX = -1;
      private static final float MAX_FALLBACK_CHAR_DISTANCE_SQ = 400f;
      private static final float MAX_FALLBACK_DEVICE_DISTANCE_SQ = 900f;
-     private static final float SELECTION_HANDLE_RADIUS = 24f;
-     private static final float SELECTION_HANDLE_TOUCH_RADIUS = 36f;
+        private static final float SELECTION_HANDLE_RADIUS = 40f;
+        private static final float SELECTION_HANDLE_TOUCH_RADIUS = 64f;
      private static final int SELECTION_POPUP_MARGIN_DP = 8;
      private static final int SELECTION_POPUP_HORIZONTAL_PADDING_DP = 16;
      private static final int SELECTION_POPUP_VERTICAL_PADDING_DP = 10;
@@ -230,6 +231,11 @@ public class PDFView extends RelativeLayout {
     private boolean fitEachPage = false;
 
      private boolean textSelectionEnabled = false;
+     private int selectionHandleColor = 0xFF2196F3;
+     private int selectionHighlightColor = 0x6633B5E5;
+     private int selectionPopupBackgroundColor = 0xFF323232;
+     private int selectionPopupTextColor = Color.WHITE;
+     private CharSequence selectionPopupText = null;
      private int selectionPage = -1;
      private int selectionStart = INVALID_CHAR_INDEX;
      private int selectionEnd = INVALID_CHAR_INDEX;
@@ -372,10 +378,10 @@ public class PDFView extends RelativeLayout {
          paint = new Paint();
          textSelectionPaint = new Paint();
          textSelectionPaint.setStyle(Style.FILL);
-         textSelectionPaint.setColor(0x6633B5E5);
+         textSelectionPaint.setColor(selectionHighlightColor);
          selectionHandlePaint = new Paint();
          selectionHandlePaint.setStyle(Style.FILL);
-         selectionHandlePaint.setColor(0xFF2196F3);
+         selectionHandlePaint.setColor(selectionHandleColor);
          debugPaint = new Paint();
          debugPaint.setStyle(Style.STROKE);
 
@@ -1742,6 +1748,28 @@ public class PDFView extends RelativeLayout {
         return textSelectionEnabled;
     }
 
+    public void setSelectionHandleColor(@ColorInt int color) {
+        selectionHandleColor = color;
+        selectionHandlePaint.setColor(color);
+    }
+
+    public void setSelectionHighlightColor(@ColorInt int color) {
+        selectionHighlightColor = color;
+        textSelectionPaint.setColor(color);
+    }
+
+    public void setSelectionPopupBackgroundColor(@ColorInt int color) {
+        selectionPopupBackgroundColor = color;
+    }
+
+    public void setSelectionPopupTextColor(@ColorInt int color) {
+        selectionPopupTextColor = color;
+    }
+
+    public void setSelectionPopupText(CharSequence text) {
+        selectionPopupText = text;
+    }
+
     public boolean hasTextSelection() {
         return selectionPage >= 0 && selectionStart >= 0 && selectionEnd >= 0;
     }
@@ -1917,14 +1945,18 @@ public class PDFView extends RelativeLayout {
 
     private TextView createSelectionActionView() {
         TextView actionView = new TextView(getContext());
-        actionView.setText(R.string.pdfview_selection_paste_action);
-        actionView.setTextColor(Color.WHITE);
+        if (selectionPopupText != null) {
+            actionView.setText(selectionPopupText);
+        } else {
+            actionView.setText(R.string.pdfview_selection_paste_action);
+        }
+        actionView.setTextColor(selectionPopupTextColor);
         actionView.setTextSize(14);
         int horizontalPadding = Util.getDP(getContext(), SELECTION_POPUP_HORIZONTAL_PADDING_DP);
         int verticalPadding = Util.getDP(getContext(), SELECTION_POPUP_VERTICAL_PADDING_DP);
         actionView.setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding);
         GradientDrawable background = new GradientDrawable();
-        background.setColor(0xFF323232);
+        background.setColor(selectionPopupBackgroundColor);
         background.setCornerRadius(Util.getDP(getContext(), SELECTION_POPUP_CORNER_RADIUS_DP));
         actionView.setBackground(background);
         actionView.setOnClickListener(v -> {
@@ -2324,6 +2356,11 @@ public class PDFView extends RelativeLayout {
         private boolean nightMode = false;
         private boolean textSelectionEnabled = false;
         private OnSelectionActionListener onSelectionActionListener;
+        private Integer selectionHandleColor = null;
+        private Integer selectionHighlightColor = null;
+        private Integer selectionPopupBackgroundColor = null;
+        private Integer selectionPopupTextColor = null;
+        private CharSequence selectionPopupText = null;
         private boolean touchPriority = false;
         private boolean useBestQuality = false;
         private float thumbnailRatio = Constants.THUMBNAIL_RATIO;
@@ -2507,6 +2544,31 @@ public class PDFView extends RelativeLayout {
             return this;
         }
 
+        public Configurator selectionHandleColor(@ColorInt int color) {
+            this.selectionHandleColor = color;
+            return this;
+        }
+
+        public Configurator selectionHighlightColor(@ColorInt int color) {
+            this.selectionHighlightColor = color;
+            return this;
+        }
+
+        public Configurator selectionPopupBackgroundColor(@ColorInt int color) {
+            this.selectionPopupBackgroundColor = color;
+            return this;
+        }
+
+        public Configurator selectionPopupTextColor(@ColorInt int color) {
+            this.selectionPopupTextColor = color;
+            return this;
+        }
+
+        public Configurator selectionPopupText(CharSequence text) {
+            this.selectionPopupText = text;
+            return this;
+        }
+
         public Configurator disableLongPress() {
             PDFView.this.dragPinchManager.disableLongPress();
             return this;
@@ -2571,6 +2633,11 @@ public class PDFView extends RelativeLayout {
             PDFView.this.setSwipeEnabled(enableSwipe);
             PDFView.this.setNightMode(nightMode);
             PDFView.this.enableTextSelection(textSelectionEnabled);
+            if (selectionHandleColor != null) PDFView.this.setSelectionHandleColor(selectionHandleColor);
+            if (selectionHighlightColor != null) PDFView.this.setSelectionHighlightColor(selectionHighlightColor);
+            if (selectionPopupBackgroundColor != null) PDFView.this.setSelectionPopupBackgroundColor(selectionPopupBackgroundColor);
+            if (selectionPopupTextColor != null) PDFView.this.setSelectionPopupTextColor(selectionPopupTextColor);
+            if (selectionPopupText != null) PDFView.this.setSelectionPopupText(selectionPopupText);
             PDFView.this.enableDoubleTap(enableDoubletap);
             PDFView.this.setDefaultPage(defaultPage);
             PDFView.this.setSwipeVertical(!swipeHorizontal);
