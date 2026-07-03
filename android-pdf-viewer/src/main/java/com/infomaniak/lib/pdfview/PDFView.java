@@ -910,24 +910,15 @@ public class PDFView extends RelativeLayout {
     }
 
     private void drawTextSelection(Canvas canvas) {
-        if (!hasTextSelection() || pdfFile == null) {
+        SelectionSetup setup = validateAndSetupSelection();
+        if (setup == null) {
             return;
         }
-
-        int page = selectionPage;
-        if (page < 0 || page >= pdfFile.getPagesCount()) {
-            return;
-        }
-
-        SizeF pageSize = pdfFile.getScaledPageSize(page, zoom);
-        PageOffsets offsets = computePageOffsets(page);
-        int pageX = offsets.x;
-        int pageY = offsets.y;
 
         int start = Math.min(selectionStart, selectionEnd);
         int end = Math.max(selectionStart, selectionEnd);
 
-        java.util.List<RectF> lineRects = buildLineSelectionRects(page, pageX, pageY, (int) pageSize.getWidth(), (int) pageSize.getHeight(), start, end);
+        java.util.List<RectF> lineRects = buildLineSelectionRects(setup.page, setup.pageX, setup.pageY, (int) setup.pageSize.getWidth(), (int) setup.pageSize.getHeight(), start, end);
         for (RectF lineRect : lineRects) {
             canvas.drawRect(lineRect, textSelectionPaint);
         }
@@ -1042,29 +1033,20 @@ public class PDFView extends RelativeLayout {
       private void drawSelectionHandles(Canvas canvas) {
           selectionStartHandleBounds = null;
           selectionEndHandleBounds = null;
-          if (!hasTextSelection() || pdfFile == null) {
+          SelectionSetup setup = validateAndSetupSelection();
+          if (setup == null) {
               return;
           }
 
-          int page = selectionPage;
-          if (page < 0 || page >= pdfFile.getPagesCount()) {
-              return;
-          }
-
-          SizeF pageSize = pdfFile.getScaledPageSize(page, zoom);
-          PageOffsets offsets = computePageOffsets(page);
-          int pageX = offsets.x;
-          int pageY = offsets.y;
-
-         int start = Math.min(selectionStart, selectionEnd);
+          int start = Math.min(selectionStart, selectionEnd);
          int end = Math.max(selectionStart, selectionEnd);
 
-         // Get start and end character boxes
-         RectF startBox = pdfFile.getCharBox(page, start);
-         RectF endBox = pdfFile.getCharBox(page, end);
+          // Get start and end character boxes
+          RectF startBox = pdfFile.getCharBox(setup.page, start);
+          RectF endBox = pdfFile.getCharBox(setup.page, end);
 
-         if (startBox != null) {
-             RectF mappedStart = pdfFile.mapRectToDevice(page, pageX, pageY, (int) pageSize.getWidth(), (int) pageSize.getHeight(), startBox);
+          if (startBox != null) {
+              RectF mappedStart = pdfFile.mapRectToDevice(setup.page, setup.pageX, setup.pageY, (int) setup.pageSize.getWidth(), (int) setup.pageSize.getHeight(), startBox);
              if (mappedStart != null) {
                  mappedStart.sort();
                  float handleX = mappedStart.left;
@@ -1077,8 +1059,8 @@ public class PDFView extends RelativeLayout {
              }
          }
 
-         if (endBox != null) {
-             RectF mappedEnd = pdfFile.mapRectToDevice(page, pageX, pageY, (int) pageSize.getWidth(), (int) pageSize.getHeight(), endBox);
+          if (endBox != null) {
+              RectF mappedEnd = pdfFile.mapRectToDevice(setup.page, setup.pageX, setup.pageY, (int) setup.pageSize.getWidth(), (int) setup.pageSize.getHeight(), endBox);
              if (mappedEnd != null) {
                  mappedEnd.sort();
                  float handleX = mappedEnd.right;
@@ -2277,6 +2259,35 @@ public class PDFView extends RelativeLayout {
             pageX = (int) pdfFile.getPageOffset(page, zoom);
         }
         return new PageOffsets(pageX, pageY);
+    }
+
+    private static class SelectionSetup {
+        final int page;
+        final SizeF pageSize;
+        final int pageX;
+        final int pageY;
+
+        SelectionSetup(int page, SizeF pageSize, int pageX, int pageY) {
+            this.page = page;
+            this.pageSize = pageSize;
+            this.pageX = pageX;
+            this.pageY = pageY;
+        }
+    }
+
+    private SelectionSetup validateAndSetupSelection() {
+        if (!hasTextSelection() || pdfFile == null) {
+            return null;
+        }
+
+        int page = selectionPage;
+        if (page < 0 || page >= pdfFile.getPagesCount()) {
+            return null;
+        }
+
+        SizeF pageSize = pdfFile.getScaledPageSize(page, zoom);
+        PageOffsets offsets = computePageOffsets(page);
+        return new SelectionSetup(page, pageSize, offsets.x, offsets.y);
     }
 
     private static class SelectionHit {
