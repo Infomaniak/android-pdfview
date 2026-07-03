@@ -70,6 +70,7 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
         setContentView(binding.root)
         initializePDFView()
         binding.selectFile.setOnClickListener { pickFile() }
+        binding.copySelection.setOnClickListener { binding.pdfView.copySelection() }
     }
 
     private fun pickFile() {
@@ -107,7 +108,7 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
 
     @SuppressLint("InflateParams")
     private fun getScrollHandle(): ScrollHandle = DefaultScrollHandle(this).apply {
-        val view = layoutInflater.inflate(R.layout.handle_background, null);
+        val view = layoutInflater.inflate(R.layout.handle_background, null)
         setPageHandleView(view, view.findViewById(R.id.pageIndicator))
         setTextColor(ResourcesCompat.getColor(resources, android.R.color.white, null))
         setTextSize(DEFAULT_TEXT_SIZE_DP)
@@ -138,6 +139,13 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
             .pageFitPolicy(FitPolicy.BOTH)
             .password(password)
             .enableTextSelection(true)
+            .selectionPopupEnabled(false)
+            .onSelectionChange { hasSelection ->
+                binding.copySelection.isEnabled = hasSelection
+                binding.copySelection.alpha = if (hasSelection) ENABLED_BUTTON_ALPHA else DISABLED_BUTTON_ALPHA
+            }
+            // Keep this for apps that want the built-in popup action instead of a custom button.
+            // .selectionPopupEnabled(true)
             .onSelectionAction { selectedText ->
                 Toast.makeText(this, selectedText, Toast.LENGTH_SHORT).show()
             }
@@ -218,5 +226,7 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
         private const val MIN_ZOOM = 0.93f
         private const val MID_ZOOM = 3.0f
         private const val MAX_ZOOM = 6.0f
+        private const val ENABLED_BUTTON_ALPHA = 1f
+        private const val DISABLED_BUTTON_ALPHA = 0.5f
     }
 }
