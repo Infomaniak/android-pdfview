@@ -18,5 +18,5 @@
   -->
 
 <resources>
-    <string name="pdfview_selection_paste_action">Liitä</string>
+    <string name="pdfview_selection_copy_action">Kopioida</string>
 </resources>

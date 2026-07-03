@@ -1976,7 +1976,7 @@ public class PDFView extends RelativeLayout {
         if (selectionPopupText != null) {
             actionView.setText(selectionPopupText);
         } else {
-            actionView.setText(R.string.pdfview_selection_paste_action);
+            actionView.setText(R.string.pdfview_selection_copy_action);
         }
         actionView.setTextColor(selectionPopupTextColor);
         actionView.setTextSize(14);

@@ -18,5 +18,5 @@
   -->
 
 <resources>
-    <string name="pdfview_selection_paste_action">Colar</string>
+    <string name="pdfview_selection_copy_action">Copiar</string>
 </resources>

@@ -18,5 +18,5 @@
   -->
 
 <resources>
-    <string name="pdfview_selection_paste_action">Einfügen</string>
+    <string name="pdfview_selection_copy_action">Kopieren</string>
 </resources>

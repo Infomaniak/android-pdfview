@@ -18,5 +18,5 @@
   -->
 
 <resources>
-    <string name="pdfview_selection_paste_action">Επικόλληση</string>
+    <string name="pdfview_selection_copy_action">Αντιγραφή</string>
 </resources>
