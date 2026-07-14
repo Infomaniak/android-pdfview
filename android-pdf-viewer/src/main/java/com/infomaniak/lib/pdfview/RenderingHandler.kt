@@ -1,18 +1,19 @@
 /*
  * Infomaniak PDF Viewer - Android
- * Copyright (C) 2025 Infomaniak Network SA
+ * Copyright (C) 2025-2026 Infomaniak Network SA
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package com.infomaniak.lib.pdfview
 
@@ -42,6 +43,9 @@ internal class RenderingHandler(
     private val renderMatrix = Matrix()
     private var running = false
 
+    @Volatile
+    private var renderingGeneration = 0L
+
     fun addRenderingTask(
         page: Int,
         renderingSize: RenderingSize,
@@ -59,6 +63,7 @@ internal class RenderingHandler(
             bestQuality,
             annotationRendering,
             isForPrinting,
+            renderingGeneration,
         )
         val msg = obtainMessage(MSG_RENDER_TASK, task)
         sendMessage(msg)
@@ -66,20 +71,32 @@ internal class RenderingHandler(
 
     fun stop() {
         running = false
+        cancelAllTasks()
     }
 
     fun start() {
         running = true
     }
 
+    fun cancelAllTasks() {
+        renderingGeneration++
+        removeMessages(MSG_RENDER_TASK)
+    }
+
     override fun handleMessage(message: Message): Unit = with(pdfView) {
         val task = message.obj as RenderingTask
         runCatching {
             proceed(task)?.let { pagePart ->
-                if (running) {
-                    post { onBitmapRendered(pagePart, task.isForPrinting) }
-                } else {
+                if (task.renderingGeneration != renderingGeneration) {
                     pagePart.renderedBitmap.recycle()
+                } else {
+                    post {
+                        if (running && task.renderingGeneration == renderingGeneration) {
+                            onBitmapRendered(pagePart, task.isForPrinting)
+                        } else {
+                            pagePart.renderedBitmap.recycle()
+                        }
+                    }
                 }
             }
         }.onFailure { exception ->
@@ -102,7 +119,9 @@ internal class RenderingHandler(
         var render: Bitmap? = null
         runCatching {
             Bitmap.createBitmap(
-                w, h, if (renderingTask.bestQuality) Bitmap.Config.ARGB_8888 else Bitmap.Config.RGB_565
+                /* width = */ w,
+                /* height = */ h,
+                /* config = */ if (renderingTask.bestQuality) Bitmap.Config.ARGB_8888 else Bitmap.Config.RGB_565,
             )
         }.onSuccess { renderedBitmap ->
             render = renderedBitmap
@@ -150,6 +169,7 @@ internal class RenderingHandler(
         var bestQuality: Boolean,
         var annotationRendering: Boolean,
         var isForPrinting: Boolean,
+        val renderingGeneration: Long,
     )
 
     companion object {
