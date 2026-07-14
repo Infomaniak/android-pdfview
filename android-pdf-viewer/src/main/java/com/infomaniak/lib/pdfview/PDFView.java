@@ -509,7 +509,6 @@ public class PDFView extends RelativeLayout {
         // Stop tasks
         if (renderingHandler != null) {
             renderingHandler.stop();
-            renderingHandler.removeMessages(RenderingHandler.MSG_RENDER_TASK);
         }
         if (decodingAsyncTask != null) {
             decodingAsyncTask.cancel(true);
@@ -839,7 +838,7 @@ public class PDFView extends RelativeLayout {
         }
 
         // Cancel all current tasks
-        renderingHandler.removeMessages(RenderingHandler.MSG_RENDER_TASK);
+        renderingHandler.cancelAllTasks();
         cacheManager.makeANewSet();
 
         pagesLoader.loadPages();
@@ -856,7 +855,7 @@ public class PDFView extends RelativeLayout {
         }
 
         // Cancel all current tasks
-        renderingHandler.removeMessages(RenderingHandler.MSG_RENDER_TASK);
+        renderingHandler.cancelAllTasks();
         cacheManager.makeANewSet();
 
         pagesLoader.loadPagesForPrinting(getPageCount());
