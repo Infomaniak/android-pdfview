@@ -20,8 +20,8 @@
     android:layout_height="match_parent"
     android:fitsSystemWindows="true">
 
-    <com.infomaniak.lib.pdfview.PDFView
-        android:id="@+id/pdfView"
+    <com.infomaniak.lib.pdfview.UnifiedPdfPreviewView
+        android:id="@+id/pdfPreviewView"
         android:layout_width="0dp"
         android:layout_height="0dp"
         app:layout_constraintBottom_toTopOf="@id/selectFile"
@@ -37,6 +37,6 @@
         android:text="Change PDF"
         app:cornerRadius="5dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/pdfView" />
+        app:layout_constraintTop_toBottomOf="@id/pdfPreviewView" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

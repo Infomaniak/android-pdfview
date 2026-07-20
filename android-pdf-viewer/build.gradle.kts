@@ -7,6 +7,7 @@ plugins {
 
 val libMinSdk: Int by rootProject.extra
 val libCompileSdk: Int by rootProject.extra
+val libCompileSdkExtension: Int by rootProject.extra
 val javaVersion: JavaVersion by rootProject.extra
 val libVersionName: String by rootProject.extra
 
@@ -16,6 +17,7 @@ android {
     defaultConfig {
         minSdk = libMinSdk
         compileSdk = libCompileSdk
+        compileSdkExtension = libCompileSdkExtension
     }
 
     publishing {
@@ -36,6 +38,7 @@ android {
 
 dependencies {
     implementation(libs.core.ktx)
+    implementation(libs.fragment.ktx)
     implementation(libs.recyclerview)
     implementation(libs.viewpager2)
 

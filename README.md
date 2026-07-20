@@ -60,6 +60,26 @@ If you are using ProGuard, add following rule to proguard config file:
         android:layout_height="match_parent"/>
 ```
 
+## Use unified preview View (AndroidX native + fallback)
+
+`UnifiedPdfPreviewView` encapsulates backend selection:
+- AndroidX native preview on supported API levels
+- automatic fallback to `PDFView` on older devices
+
+```xml
+<com.infomaniak.lib.pdfview.UnifiedPdfPreviewView
+        android:id="@+id/pdfPreviewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
+```
+
+```kotlin
+pdfPreviewView.attach(supportFragmentManager, viewLifecycleOwner)
+pdfPreviewView.loadFromUri(uri)
+```
+
+When native backend is selected, `attach(fragmentManager, lifecycleOwner)` is required before `loadFromUri`.
+
 ## Load a PDF file
 
 All available options with default values:
