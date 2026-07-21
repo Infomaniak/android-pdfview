@@ -35,7 +35,7 @@ import androidx.lifecycle.LifecycleOwner
  * A unified PDF preview [FrameLayout] that uses AndroidX native PDF preview when available
  * and falls back to [PDFView] otherwise.
  *
- * The AndroidX backend requires calling [attach] before [loadFromUri].
+ * The AndroidX mode requires calling [attach] before [loadFromUri].
  */
 class UnifiedPdfPreviewView @JvmOverloads constructor(
     context: Context,
@@ -51,7 +51,18 @@ class UnifiedPdfPreviewView @JvmOverloads constructor(
         fun create(): Fragment
     }
 
-    enum class Backend {
+    /**
+     * Consumer-facing mode used to decide how PDF rendering is selected.
+     */
+    enum class PdfViewerMode {
+        AUTOMATIC,
+        PDF_VIEW_ONLY,
+    }
+
+    /**
+     * Internal effective renderer chosen for the last load.
+     */
+    enum class ActivePdfViewerMode {
         ANDROIDX_NATIVE,
         PDF_VIEW,
     }
@@ -63,7 +74,8 @@ class UnifiedPdfPreviewView @JvmOverloads constructor(
     private var attachedFragmentManager: FragmentManager? = null
     private var attachedLifecycleOwner: LifecycleOwner? = null
     private var lifecycleObserver: DefaultLifecycleObserver? = null
-    private var lastBackend: Backend? = null
+    private var activePdfViewerMode: ActivePdfViewerMode? = null
+    private var pdfViewerMode: PdfViewerMode = PdfViewerMode.AUTOMATIC
     private var nativeFragmentFactory: NativeFragmentFactory? = null
 
     init {
@@ -84,7 +96,7 @@ class UnifiedPdfPreviewView @JvmOverloads constructor(
     }
 
     /**
-     * Attaches this view to a [FragmentManager]. Required when AndroidX native backend is selected.
+     * Attaches this view to a [FragmentManager]. Required when AndroidX native mode is selected.
      */
     fun attach(fragmentManager: FragmentManager, lifecycleOwner: LifecycleOwner) {
         detach()
@@ -118,30 +130,41 @@ class UnifiedPdfPreviewView @JvmOverloads constructor(
     fun loadFromUri(
         uri: Uri?,
         password: String? = null,
-        preferNativeBackend: Boolean = true,
+        preferNativeMode: Boolean = true,
         fallbackConfigurator: FallbackConfigurator? = null,
     ) {
         require(uri != null) { "uri must not be null" }
-        if (preferNativeBackend && canUseAndroidXNativeBackend()) {
-            showNativeBackend(uri)
+        val shouldUseNativeMode = when (pdfViewerMode) {
+            PdfViewerMode.AUTOMATIC -> preferNativeMode && canUseAndroidXNativeMode()
+            PdfViewerMode.PDF_VIEW_ONLY -> false
+        }
+
+        if (shouldUseNativeMode) {
+            showNativeMode(uri)
         } else {
-            showFallbackBackend(uri, password, fallbackConfigurator)
+            showPdfViewMode(uri, password, fallbackConfigurator)
         }
     }
 
-    fun getCurrentBackend(): Backend? = lastBackend
+    fun setPdfViewerMode(mode: PdfViewerMode) {
+        pdfViewerMode = mode
+    }
+
+    fun getPdfViewerMode(): PdfViewerMode = pdfViewerMode
+
+    fun getCurrentPdfViewerMode(): ActivePdfViewerMode? = activePdfViewerMode
 
     fun setNativeFragmentFactory(factory: NativeFragmentFactory?) {
         nativeFragmentFactory = factory
     }
 
-    private fun canUseAndroidXNativeBackend(): Boolean {
+    private fun canUseAndroidXNativeMode(): Boolean {
         return Build.VERSION.SDK_INT >= 35 && isAndroidXPdfViewerAvailable()
     }
 
-    private fun showNativeBackend(uri: Uri) {
+    private fun showNativeMode(uri: Uri) {
         val fragmentManager = requireNotNull(attachedFragmentManager) {
-            "attach(fragmentManager, lifecycleOwner) must be called before loadFromUri() when native backend is selected."
+            "attach(fragmentManager, lifecycleOwner) must be called before loadFromUri() when native mode is selected."
         }
         val nativeFragment = fragmentManager.findFragmentByTag(nativeFragmentTag) ?: createNativeFragment().also {
             fragmentManager.commitNow { replace(nativeContainer.id, it, nativeFragmentTag) }
@@ -151,10 +174,10 @@ class UnifiedPdfPreviewView @JvmOverloads constructor(
         fallbackPdfView.isGone = true
         nativeContainer.isVisible = true
         setDocumentUri(nativeFragment, uri)
-        lastBackend = Backend.ANDROIDX_NATIVE
+        activePdfViewerMode = ActivePdfViewerMode.ANDROIDX_NATIVE
     }
 
-    private fun showFallbackBackend(uri: Uri, password: String?, fallbackConfigurator: FallbackConfigurator?) {
+    private fun showPdfViewMode(uri: Uri, password: String?, fallbackConfigurator: FallbackConfigurator?) {
         nativeContainer.isGone = true
         fallbackPdfView.isVisible = true
         fallbackPdfView.background = background?.constantState?.newDrawable(resources)?.mutate()
@@ -162,7 +185,7 @@ class UnifiedPdfPreviewView @JvmOverloads constructor(
         val configurator = fallbackPdfView.fromUri(uri).password(password)
         fallbackConfigurator?.configure(configurator)
         configurator.load()
-        lastBackend = Backend.PDF_VIEW
+        activePdfViewerMode = ActivePdfViewerMode.PDF_VIEW
     }
 
     private fun isAndroidXPdfViewerAvailable(): Boolean {

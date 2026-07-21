@@ -4,6 +4,7 @@ buildscript {
         set("libMinSdk", 21)
         set("libCompileSdk", 36)
         set("libVersionName", "3.2.16")
+        set("libCompileSdkExtension", 19)
         set("javaVersion", JavaVersion.VERSION_17)
     }
 

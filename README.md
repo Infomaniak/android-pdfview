@@ -62,9 +62,13 @@ If you are using ProGuard, add following rule to proguard config file:
 
 ## Use unified preview View (AndroidX native + fallback)
 
-`UnifiedPdfPreviewView` encapsulates backend selection:
+`UnifiedPdfPreviewView` encapsulates `PdfViewerMode` selection:
 - AndroidX native preview on supported API levels
 - automatic fallback to `PDFView` on older devices
+
+Available modes:
+- `PdfViewerMode.AUTOMATIC` (default): AndroidX native when available, otherwise `PDFView`
+- `PdfViewerMode.PDF_VIEW_ONLY`: force `PDFView` only
 
 ```xml
 <com.infomaniak.lib.pdfview.UnifiedPdfPreviewView
@@ -75,10 +79,11 @@ If you are using ProGuard, add following rule to proguard config file:
 
 ```kotlin
 pdfPreviewView.attach(supportFragmentManager, viewLifecycleOwner)
+pdfPreviewView.setPdfViewerMode(UnifiedPdfPreviewView.PdfViewerMode.AUTOMATIC) // default
 pdfPreviewView.loadFromUri(uri)
 ```
 
-When native backend is selected, `attach(fragmentManager, lifecycleOwner)` is required before `loadFromUri`.
+When native mode is selected, `attach(fragmentManager, lifecycleOwner)` is required before `loadFromUri`.
 
 ## Load a PDF file
 
