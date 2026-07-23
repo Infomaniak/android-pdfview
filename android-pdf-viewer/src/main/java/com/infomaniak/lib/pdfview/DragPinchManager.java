@@ -225,7 +225,6 @@ class DragPinchManager implements
 
     @Override
     public boolean onScroll(MotionEvent e1, @NonNull MotionEvent e2, float distanceX, float distanceY) {
-        // Ignorer le scroll si on drag un handle de selection
         if (draggingSelectionHandle) {
             return true;
         }
@@ -274,7 +273,6 @@ class DragPinchManager implements
 
     @Override
     public boolean onFling(MotionEvent e1, @NonNull MotionEvent e2, float velocityX, float velocityY) {
-        // Ignorer le fling si on drag un handle de selection
         if (draggingSelectionHandle) {
             return true;
         }

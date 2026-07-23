@@ -1026,7 +1026,6 @@ public class PDFView extends RelativeLayout {
              totalHeight += box.height();
          }
          float avgHeight = totalHeight / boxes.size();
-         // Utiliser 30% de la hauteur moyenne comme seuil de gap
          return avgHeight * 0.3f;
      }
 
