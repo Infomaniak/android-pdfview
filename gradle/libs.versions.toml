@@ -1,12 +1,12 @@
 [versions]
-activityKtx = "1.11.0"
+activityKtx = "1.13.0"
 androidannotations = "4.8.0"
 appcompat = "1.7.1"
-coreKtx = "1.17.0"
+coreKtx = "1.18.0"
 agp = "8.13.0"
 kotlinAndroid = "2.2.20"
-material = "1.13.0"
-pdfium = "1.9.11"
+material = "1.14.0"
+pdfium = "1.9.12"
 recyclerView = "1.4.0"
 viewpager2 = "1.1.0"
 
@@ -16,7 +16,7 @@ androidannotations = { module = "org.androidannotations:androidannotations", ver
 appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 material = { module = "com.google.android.material:material", version.ref = "material" }
-pdfium = { module = "com.github.infomaniak:PdfiumAndroid", version.ref = "pdfium" }
+pdfium = { module = "com.infomaniak:pdfiumandroid", version.ref = "pdfium" }
 recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerView" }
 viewpager2 = { module = "androidx.viewpager2:viewpager2", version.ref = "viewpager2" }
 

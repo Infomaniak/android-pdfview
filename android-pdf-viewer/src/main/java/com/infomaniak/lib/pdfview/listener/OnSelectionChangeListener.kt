@@ -15,33 +15,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+package com.infomaniak.lib.pdfview.listener
 
-buildscript {
-
-    extra.apply {
-        set("libMinSdk", 23)
-        set("libCompileSdk", 36)
-        set("libVersionName", "3.2.17")
-        set("javaVersion", JavaVersion.VERSION_17)
-    }
-
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-apply(plugin = "maven-publish")
-
-plugins {
-    alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.android.library) apply false
-}
-
-allprojects {
-    repositories {
-        google()
-        // mavenLocal()
-        mavenCentral()
-    }
+fun interface OnSelectionChangeListener {
+    /**
+     * Called whenever the text selection state changes.
+     * @param hasSelection `true` if text is currently selected, `false` if selection was cleared.
+     */
+    fun onSelectionChanged(hasSelection: Boolean)
 }

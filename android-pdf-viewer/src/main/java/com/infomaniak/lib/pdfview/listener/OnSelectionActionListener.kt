@@ -1,6 +1,6 @@
 /*
  * Infomaniak android-pdf-viewer
- * Copyright (C) 2026 Infomaniak Network SA
+ * Copyright (C) 2025-2026 Infomaniak Network SA
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,33 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+package com.infomaniak.lib.pdfview.listener
 
-buildscript {
-
-    extra.apply {
-        set("libMinSdk", 23)
-        set("libCompileSdk", 36)
-        set("libVersionName", "3.2.17")
-        set("javaVersion", JavaVersion.VERSION_17)
-    }
-
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-apply(plugin = "maven-publish")
-
-plugins {
-    alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.android.library) apply false
-}
-
-allprojects {
-    repositories {
-        google()
-        // mavenLocal()
-        mavenCentral()
-    }
+fun interface OnSelectionActionListener {
+    fun onCopySelection(selectedText: String)
 }

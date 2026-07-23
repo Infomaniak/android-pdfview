@@ -102,6 +102,15 @@ pdfView.fromAsset(String)
     .pageSnap(false) // snap pages to screen boundaries
     .pageFling(false) // make a fling change only a single page like ViewPager
     .nightMode(false) // toggle night mode
+    .enableTextSelection(false) // long press + drag to select text on a single page
+    .onSelectionAction(onSelectionActionListener) // called when the selection action popup is tapped (or copySelection() is called)
+    .onSelectionChange(onSelectionChangeListener) // called when selection becomes active or is cleared
+    .selectionPopupEnabled(true) // set to false to use your own copy UI (default: true)
+    .selectionHandleColor(Color) // color of the selection handles (default: #2196F3)
+    .selectionHighlightColor(Color) // color of the text highlight overlay (default: semi-transparent blue)
+    .selectionPopupBackgroundColor(Color) // background color of the action popup (default: #323232)
+    .selectionPopupTextColor(Color) // text color of the action popup (default: white)
+    .selectionPopupText(CharSequence) // label of the action popup (default: locale "Copy")
     .load();
 ```
 
@@ -155,6 +164,53 @@ and clicking on link that targets some URI causes opening it in default applicat
 You can also create custom link handlers, just implement **LinkHandler** interface and set it using
 `Configurator#linkHandler(LinkHandler)` method. Take a look at [DefaultLinkHandler](https://github.com/barteksc/AndroidPdfViewer/tree/master/android-pdf-viewer/src/main/java/com/github/barteksc/pdfviewer/link/DefaultLinkHandler.java)
 source to implement custom behavior.
+
+## Text selection
+
+Text selection can be enabled with `Configurator#enableTextSelection(true)`.
+
+- Long press on text to start selection
+- Drag your finger to extend/reduce the selection
+- Draggable handles are displayed at the start and end of the selection to resize it
+- A popup is displayed above the selection with a configurable action label (defaults to the locale-appropriate word for "Copy")
+- Receive the selected text when that action is tapped with `Configurator#onSelectionAction(...)`
+- Read selected text with `PDFView#getSelectedText()`
+- Clear current selection with `PDFView#clearTextSelection()`
+
+### Customization
+
+All visual aspects of text selection can be configured via the `Configurator`:
+
+```kotlin
+pdfView.fromUri(uri)
+    .enableTextSelection(true)
+    .onSelectionAction { selectedText -> /* handle selected text */ }
+    .onSelectionChange { hasSelection -> /* show/hide your own copy button */ }
+    .selectionPopupEnabled(true)             // set to false to disable the built-in popup (default: true)
+    .selectionHandleColor(Color.BLUE)           // color of the draggable handles (default: #2196F3)
+    .selectionHighlightColor(0x6633B5E5)        // color of the text highlight overlay (default: semi-transparent blue)
+    .selectionPopupBackgroundColor(Color.DKGRAY) // background color of the action popup (default: #323232)
+    .selectionPopupTextColor(Color.WHITE)        // text color of the action popup (default: white)
+    .selectionPopupText("Copy")                  // label shown in the popup (default: locale string "Copy"/"Copier"/…)
+    .load()
+```
+
+### Custom copy UI
+
+If you provide your own copy button (e.g. in a `TopAppBar`), disable the built-in popup and use
+`pdfView.copySelection()` to programmatically trigger the action:
+
+```kotlin
+pdfView.fromUri(uri)
+    .enableTextSelection(true)
+    .selectionPopupEnabled(false)
+    .onSelectionChange { hasSelection -> myToolbar.copyButton.isVisible = hasSelection }
+    .onSelectionAction { selectedText -> clipboard.setPrimaryClip(...) }
+    .load()
+
+// In your button click handler:
+binding.copyButton.setOnClickListener { pdfView.copySelection() }
+```
 
 ## Pages fit policy
 Since version 3.0.0, library supports fitting pages into the screen in 3 modes:

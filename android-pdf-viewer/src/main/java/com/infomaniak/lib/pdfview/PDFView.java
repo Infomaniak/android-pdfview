@@ -1,18 +1,19 @@
 /*
- * Infomaniak PDF Viewer - Android
- * Copyright (C) 2025 Infomaniak Network SA
+ * Infomaniak android-pdf-viewer
+ * Copyright (C) 2025-2026 Infomaniak Network SA
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package com.infomaniak.lib.pdfview;
 
@@ -28,15 +29,24 @@ import android.graphics.PaintFlagsDrawFilter;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.HandlerThread;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
+import android.widget.PopupWindow;
 import android.widget.RelativeLayout;
+import android.widget.TextView;
 
+import androidx.annotation.ColorInt;
 import androidx.annotation.FloatRange;
 
 import com.infomaniak.lib.pdfview.exception.PageRenderingException;
@@ -54,6 +64,8 @@ import com.infomaniak.lib.pdfview.listener.OnPageErrorListener;
 import com.infomaniak.lib.pdfview.listener.OnPageScrollListener;
 import com.infomaniak.lib.pdfview.listener.OnReadyForPrintingListener;
 import com.infomaniak.lib.pdfview.listener.OnRenderListener;
+import com.infomaniak.lib.pdfview.listener.OnSelectionActionListener;
+import com.infomaniak.lib.pdfview.listener.OnSelectionChangeListener;
 import com.infomaniak.lib.pdfview.listener.OnTapListener;
 import com.infomaniak.lib.pdfview.model.PagePart;
 import com.infomaniak.lib.pdfview.scroll.ScrollHandle;
@@ -100,6 +112,17 @@ import java.util.List;
 public class PDFView extends RelativeLayout {
 
     private static final String TAG = PDFView.class.getSimpleName();
+    private static final int INVALID_CHAR_INDEX = -1;
+    private static final float MAX_FALLBACK_CHAR_DISTANCE_SQ = 400f;
+    private static final float MAX_FALLBACK_DEVICE_DISTANCE_SQ = 900f;
+    private static final float SELECTION_HANDLE_RADIUS = 40f;
+    private static final float SELECTION_HANDLE_TOUCH_RADIUS = 64f;
+    private static final int SELECTION_POPUP_MARGIN_DP = 8;
+    private static final int SELECTION_POPUP_HORIZONTAL_PADDING_DP = 16;
+    private static final int SELECTION_POPUP_VERTICAL_PADDING_DP = 10;
+    private static final int SELECTION_POPUP_CORNER_RADIUS_DP = 12;
+    private static final int SELECTION_POPUP_ELEVATION_DP = 6;
+    private static final float SELECTION_POPUP_TEXT_SIZE_SP = 14f;
 
     public static final float DEFAULT_MAX_SCALE = 3.0f;
     public static final float DEFAULT_MID_SCALE = 1.75f;
@@ -192,12 +215,16 @@ public class PDFView extends RelativeLayout {
     /**
      * Paint object for drawing
      */
-    private Paint paint;
+     private Paint paint;
 
-    /**
-     * Paint object for drawing debug stuff
-     */
-    private Paint debugPaint;
+     private Paint textSelectionPaint;
+
+     private Paint selectionHandlePaint;
+
+     /**
+      * Paint object for drawing debug stuff
+      */
+     private Paint debugPaint;
 
     /**
      * Policy for fitting pages to screen
@@ -205,6 +232,25 @@ public class PDFView extends RelativeLayout {
     private FitPolicy pageFitPolicy = FitPolicy.WIDTH;
 
     private boolean fitEachPage = false;
+
+     private boolean textSelectionEnabled = false;
+     private boolean selectionPopupEnabled = true;
+     private int selectionHandleColor = 0xFF2196F3;
+     private int selectionHighlightColor = 0x6633B5E5;
+     private int selectionPopupBackgroundColor = 0xFF323232;
+     private int selectionPopupTextColor = Color.WHITE;
+     private CharSequence selectionPopupText = null;
+     private int selectionPage = -1;
+     private int selectionStart = INVALID_CHAR_INDEX;
+     private int selectionEnd = INVALID_CHAR_INDEX;
+     private RectF selectionStartHandleBounds = null;
+     private RectF selectionEndHandleBounds = null;
+     private String selectedText = "";
+     private PopupWindow selectionActionPopup;
+     private boolean allowSelectionActionPopupAutoShow = false;
+     private final Rect popupVisibleRect = new Rect();
+     private final ViewTreeObserver.OnScrollChangedListener selectionPopupScrollChangedListener = this::syncSelectionActionPopupWithViewVisibility;
+     private final ViewTreeObserver.OnGlobalLayoutListener selectionPopupGlobalLayoutListener = this::syncSelectionActionPopupWithViewVisibility;
 
     private int defaultPage = 0;
 
@@ -333,11 +379,19 @@ public class PDFView extends RelativeLayout {
         dragPinchManager = new DragPinchManager(this, animationManager);
         pagesLoader = new PagesLoader(this);
 
-        paint = new Paint();
-        debugPaint = new Paint();
-        debugPaint.setStyle(Style.STROKE);
+         paint = new Paint();
+         textSelectionPaint = new Paint();
+         textSelectionPaint.setStyle(Style.FILL);
+         textSelectionPaint.setColor(selectionHighlightColor);
+         selectionHandlePaint = new Paint();
+         selectionHandlePaint.setStyle(Style.FILL);
+         selectionHandlePaint.setColor(selectionHandleColor);
+         debugPaint = new Paint();
+         debugPaint.setStyle(Style.STROKE);
 
         pdfiumCore = new PdfiumCore(context);
+        setClickable(true);
+        setLongClickable(true);
         setWillNotDraw(false);
     }
 
@@ -502,6 +556,7 @@ public class PDFView extends RelativeLayout {
 
     public void recycle() {
         waitingDocumentConfigurator = null;
+        dismissSelectionActionPopup();
 
         animationManager.stopAll();
         dragPinchManager.disable();
@@ -531,6 +586,7 @@ public class PDFView extends RelativeLayout {
         isScrollHandleInit = false;
         currentXOffset = currentYOffset = 0;
         zoom = DEFAULT_MIN_SCALE;
+        clearTextSelectionInternal(false);
         recycled = true;
         callbacks.clear();
         state = State.DEFAULT;
@@ -559,11 +615,34 @@ public class PDFView extends RelativeLayout {
         if (renderingHandlerThread == null) {
             renderingHandlerThread = new HandlerThread("PDF renderer");
         }
+        ViewTreeObserver observer = getViewTreeObserver();
+        if (observer.isAlive()) {
+            observer.addOnScrollChangedListener(selectionPopupScrollChangedListener);
+            observer.addOnGlobalLayoutListener(selectionPopupGlobalLayoutListener);
+        }
+        syncSelectionActionPopupWithViewVisibility();
+    }
+
+    @Override
+    protected void onVisibilityChanged(View changedView, int visibility) {
+        super.onVisibilityChanged(changedView, visibility);
+        syncSelectionActionPopupWithViewVisibility();
+    }
+
+    @Override
+    protected void onWindowVisibilityChanged(int visibility) {
+        super.onWindowVisibilityChanged(visibility);
+        syncSelectionActionPopupWithViewVisibility();
     }
 
     @Override
     protected void onDetachedFromWindow() {
         callbacks.callOnDetachComplete();
+        ViewTreeObserver observer = getViewTreeObserver();
+        if (observer.isAlive()) {
+            observer.removeOnScrollChangedListener(selectionPopupScrollChangedListener);
+            observer.removeOnGlobalLayoutListener(selectionPopupGlobalLayoutListener);
+        }
         recycle();
         if (renderingHandlerThread != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
@@ -734,9 +813,12 @@ public class PDFView extends RelativeLayout {
         for (Integer page : onDrawPagesNums) {
             drawWithListener(canvas, page, callbacks.getOnDrawAll());
         }
-        onDrawPagesNums.clear();
+         onDrawPagesNums.clear();
 
-        drawWithListener(canvas, currentPage, callbacks.getOnDraw());
+         drawTextSelection(canvas);
+         drawSelectionHandles(canvas);
+
+         drawWithListener(canvas, currentPage, callbacks.getOnDraw());
 
         // Restores the canvas position
         canvas.translate(-currentXOffset, -currentYOffset);
@@ -827,8 +909,172 @@ public class PDFView extends RelativeLayout {
         canvas.translate(-localTranslationX, -localTranslationY);
     }
 
-    /**
-     * Load all the parts around the center of the screen,
+    private void drawTextSelection(Canvas canvas) {
+        SelectionSetup setup = validateAndSetupSelection();
+        if (setup == null) {
+            return;
+        }
+
+        int start = Math.min(selectionStart, selectionEnd);
+        int end = Math.max(selectionStart, selectionEnd);
+
+        java.util.List<RectF> lineRects = buildLineSelectionRects(setup.page, setup.pageX, setup.pageY, (int) setup.pageSize.getWidth(), (int) setup.pageSize.getHeight(), start, end);
+        for (RectF lineRect : lineRects) {
+            canvas.drawRect(lineRect, textSelectionPaint);
+        }
+    }
+
+    private java.util.List<RectF> buildLineSelectionRects(int page, int pageX, int pageY, int pageWidth, int pageHeight, int start, int end) {
+        java.util.List<RectF> lineRects = new ArrayList<>();
+        if (start > end || start < 0) {
+            return lineRects;
+        }
+
+        // Collect all mapped rectangles for each character
+        java.util.List<RectF> mappedBoxes = new java.util.ArrayList<>();
+        for (int charIndex = start; charIndex <= end; charIndex++) {
+            RectF charBox = pdfFile.getCharBox(page, charIndex);
+            if (charBox == null) {
+                continue;
+            }
+            RectF mappedRect = pdfFile.mapRectToDevice(page, pageX, pageY, pageWidth, pageHeight, charBox);
+            if (mappedRect != null) {
+                mappedRect.sort();
+                mappedBoxes.add(mappedRect);
+            }
+        }
+
+        if (mappedBoxes.isEmpty()) {
+            return lineRects;
+        }
+
+        // Sort by X to process characters in reading order
+        Collections.sort(mappedBoxes, (a, b) -> Float.compare(a.centerX(), b.centerX()));
+
+        // Estimer le seuil de distance Y
+        float lineGapThreshold = estimateLineGapThreshold(mappedBoxes);
+
+        // Group by line using Y overlap/proximity
+        java.util.List<java.util.List<RectF>> lineGroups = new java.util.ArrayList<>();
+        for (RectF box : mappedBoxes) {
+            boolean added = false;
+            for (java.util.List<RectF> group : lineGroups) {
+                if (isOnSameLine(group, box, lineGapThreshold)) {
+                    group.add(box);
+                    added = true;
+                    break;
+                }
+            }
+            if (!added) {
+                java.util.List<RectF> newGroup = new java.util.ArrayList<>();
+                newGroup.add(box);
+                lineGroups.add(newGroup);
+            }
+        }
+
+        // Create a continuous rectangle per line
+        for (java.util.List<RectF> group : lineGroups) {
+            float minLeft = Float.MAX_VALUE;
+            float maxRight = Float.MIN_VALUE;
+            float minTop = Float.MAX_VALUE;
+            float maxBottom = Float.MIN_VALUE;
+
+            for (RectF box : group) {
+                minLeft = Math.min(minLeft, box.left);
+                maxRight = Math.max(maxRight, box.right);
+                minTop = Math.min(minTop, box.top);
+                maxBottom = Math.max(maxBottom, box.bottom);
+            }
+
+            lineRects.add(new RectF(minLeft, minTop, maxRight, maxBottom));
+        }
+
+        return lineRects;
+    }
+
+    private boolean isOnSameLine(java.util.List<RectF> group, RectF newBox, float threshold) {
+        for (RectF existing : group) {
+             // Check Y overlap or proximity
+            float gap = computeYGap(existing, newBox);
+            if (gap <= threshold) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private float computeYGap(RectF box1, RectF box2) {
+         // If boxes overlap in Y, no gap
+        if (box1.bottom >= box2.top && box1.top <= box2.bottom) {
+            return 0;
+        }
+         // Otherwise, distance between boxes
+        if (box1.bottom < box2.top) {
+            return box2.top - box1.bottom;
+        } else {
+            return box1.top - box2.bottom;
+        }
+    }
+
+     private float estimateLineGapThreshold(List<RectF> boxes) {
+         if (boxes.size() < 2) {
+             return 5f;
+         }
+         // Estimate average character height
+         float totalHeight = 0f;
+         for (RectF box : boxes) {
+             totalHeight += box.height();
+         }
+         float avgHeight = totalHeight / boxes.size();
+         return avgHeight * 0.3f;
+     }
+
+      private void drawSelectionHandles(Canvas canvas) {
+          selectionStartHandleBounds = null;
+          selectionEndHandleBounds = null;
+          SelectionSetup setup = validateAndSetupSelection();
+          if (setup == null) {
+              return;
+          }
+
+          int start = Math.min(selectionStart, selectionEnd);
+         int end = Math.max(selectionStart, selectionEnd);
+
+          // Get start and end character boxes
+          RectF startBox = pdfFile.getCharBox(setup.page, start);
+          RectF endBox = pdfFile.getCharBox(setup.page, end);
+
+          if (startBox != null) {
+              RectF mappedStart = pdfFile.mapRectToDevice(setup.page, setup.pageX, setup.pageY, (int) setup.pageSize.getWidth(), (int) setup.pageSize.getHeight(), startBox);
+             if (mappedStart != null) {
+                 mappedStart.sort();
+                 float handleX = mappedStart.left;
+                 float handleY = mappedStart.centerY();
+                 float touchHandleX = handleX + currentXOffset;
+                 float touchHandleY = handleY + currentYOffset;
+                 selectionStartHandleBounds = new RectF(touchHandleX - SELECTION_HANDLE_TOUCH_RADIUS, touchHandleY - SELECTION_HANDLE_TOUCH_RADIUS,
+                         touchHandleX + SELECTION_HANDLE_TOUCH_RADIUS, touchHandleY + SELECTION_HANDLE_TOUCH_RADIUS);
+                 canvas.drawCircle(handleX, handleY, SELECTION_HANDLE_RADIUS, selectionHandlePaint);
+             }
+         }
+
+          if (endBox != null) {
+              RectF mappedEnd = pdfFile.mapRectToDevice(setup.page, setup.pageX, setup.pageY, (int) setup.pageSize.getWidth(), (int) setup.pageSize.getHeight(), endBox);
+             if (mappedEnd != null) {
+                 mappedEnd.sort();
+                 float handleX = mappedEnd.right;
+                 float handleY = mappedEnd.centerY();
+                 float touchHandleX = handleX + currentXOffset;
+                 float touchHandleY = handleY + currentYOffset;
+                 selectionEndHandleBounds = new RectF(touchHandleX - SELECTION_HANDLE_TOUCH_RADIUS, touchHandleY - SELECTION_HANDLE_TOUCH_RADIUS,
+                         touchHandleX + SELECTION_HANDLE_TOUCH_RADIUS, touchHandleY + SELECTION_HANDLE_TOUCH_RADIUS);
+                 canvas.drawCircle(handleX, handleY, SELECTION_HANDLE_RADIUS, selectionHandlePaint);
+             }
+         }
+     }
+
+     /**
+      * Load all the parts around the center of the screen,
      * taking into account X and Y offsets, zoom level, and
      * the current page displayed
      */
@@ -945,6 +1191,7 @@ public class PDFView extends RelativeLayout {
      * @param moveHandle whether to move scroll handle or not
      */
     public void moveTo(float offsetX, float offsetY, boolean moveHandle) {
+        boolean offsetsChanged = offsetX != currentXOffset || offsetY != currentYOffset;
         if (swipeVertical) {
             // Check X offset
             float scaledPageWidth = toCurrentScale(pdfFile.getMaxPageWidth());
@@ -1022,6 +1269,10 @@ public class PDFView extends RelativeLayout {
         }
 
         callbacks.callOnPageScroll(getCurrentPage(), positionOffset);
+
+        if (offsetsChanged) {
+            syncSelectionActionPopupWithViewVisibility();
+        }
 
         redraw();
     }
@@ -1465,6 +1716,582 @@ public class PDFView extends RelativeLayout {
         return pdfFile.getPageLinks(page);
     }
 
+    public void enableTextSelection(boolean enabled) {
+        textSelectionEnabled = enabled;
+        if (!enabled) {
+            clearTextSelectionInternal(true);
+        }
+    }
+
+    public boolean isTextSelectionEnabled() {
+        return textSelectionEnabled;
+    }
+
+    public void setSelectionHandleColor(@ColorInt int color) {
+        selectionHandleColor = color;
+        selectionHandlePaint.setColor(color);
+    }
+
+    public void setSelectionHighlightColor(@ColorInt int color) {
+        selectionHighlightColor = color;
+        textSelectionPaint.setColor(color);
+    }
+
+    public void setSelectionPopupBackgroundColor(@ColorInt int color) {
+        selectionPopupBackgroundColor = color;
+    }
+
+    public void setSelectionPopupTextColor(@ColorInt int color) {
+        selectionPopupTextColor = color;
+    }
+
+    public void setSelectionPopupText(CharSequence text) {
+        selectionPopupText = text;
+    }
+
+    public void setSelectionPopupEnabled(boolean enabled) {
+        selectionPopupEnabled = enabled;
+        if (!enabled) {
+            dismissSelectionActionPopup();
+        }
+    }
+
+    /**
+     * Programmatically triggers the selection action (equivalent to tapping the popup button).
+     * Does nothing if there is no active text selection.
+     * Can be used when {@link #setSelectionPopupEnabled(boolean)} is false and the host app
+     * provides its own copy/paste UI.
+     */
+    public void copySelection() {
+        if (hasTextSelection() && !selectedText.isEmpty()) {
+            callbacks.callOnCopySelection(selectedText);
+        }
+    }
+
+    public boolean hasTextSelection() {
+        return selectionPage >= 0 && selectionStart >= 0 && selectionEnd >= 0;
+    }
+
+    public String getSelectedText() {
+        return selectedText;
+    }
+
+     public void clearTextSelection() {
+         clearTextSelectionInternal(true);
+     }
+
+     boolean isStartHandleTouched(float x, float y) {
+         return selectionStartHandleBounds != null && selectionStartHandleBounds.contains(x, y);
+     }
+
+     boolean isEndHandleTouched(float x, float y) {
+         return selectionEndHandleBounds != null && selectionEndHandleBounds.contains(x, y);
+     }
+
+     void extendSelectionFromStart(float x, float y) {
+        extendSelection(x, y, true);
+     }
+
+     void extendSelectionFromEnd(float x, float y) {
+        extendSelection(x, y, false);
+     }
+
+     private void extendSelection(float x, float y, boolean fromStartHandle) {
+         if (!hasTextSelection()) {
+             return;
+         }
+         SelectionHit hit = getSelectionHit(x, y);
+         if (hit == null || hit.page != selectionPage) {
+             return;
+         }
+         int currentIndex = fromStartHandle ? selectionStart : selectionEnd;
+         if (currentIndex != hit.charIndex) {
+             if (fromStartHandle) {
+                 selectionStart = hit.charIndex;
+             } else {
+                 selectionEnd = hit.charIndex;
+             }
+             selectedText = computeSelectedText();
+             updateSelectionActionPopupPosition();
+             redraw();
+             return;
+         }
+         updateSelectionActionPopupPosition();
+     }
+
+    boolean startTextSelection(float x, float y) {
+        if (!textSelectionEnabled || pdfFile == null || state != State.SHOWN) {
+            return false;
+        }
+
+        allowSelectionActionPopupAutoShow = false;
+        dismissSelectionActionPopup();
+
+        SelectionHit hit = getSelectionHit(x, y);
+        if (hit == null) {
+            return false;
+        }
+
+        selectionPage = hit.page;
+        selectionStart = hit.charIndex;
+        selectionEnd = hit.charIndex;
+        selectedText = computeSelectedText();
+        callbacks.callOnSelectionChanged(true);
+        redraw();
+        return true;
+    }
+
+    boolean updateTextSelection(float x, float y) {
+        if (!hasTextSelection()) {
+            return false;
+        }
+
+        SelectionHit hit = getSelectionHit(x, y);
+        if (hit == null || hit.page != selectionPage) {
+            return false;
+        }
+
+        if (selectionEnd != hit.charIndex) {
+            selectionEnd = hit.charIndex;
+            selectedText = computeSelectedText();
+            updateSelectionActionPopupPosition();
+            redraw();
+        }
+        return true;
+    }
+
+    void finishTextSelection() {
+        if (hasTextSelection()) {
+            selectedText = computeSelectedText();
+            if (selectionPopupEnabled) {
+                allowSelectionActionPopupAutoShow = true;
+                showSelectionActionPopup();
+            }
+        }
+    }
+
+    private void clearTextSelectionInternal(boolean redraw) {
+        allowSelectionActionPopupAutoShow = false;
+        dismissSelectionActionPopup();
+        boolean hadSelection = hasTextSelection();
+        selectionPage = -1;
+        selectionStart = INVALID_CHAR_INDEX;
+        selectionEnd = INVALID_CHAR_INDEX;
+        selectionStartHandleBounds = null;
+        selectionEndHandleBounds = null;
+        selectedText = "";
+        if (hadSelection) {
+            callbacks.callOnSelectionChanged(false);
+        }
+        if (redraw) {
+            redraw();
+        }
+    }
+
+    private String computeSelectedText() {
+        if (!hasTextSelection() || pdfFile == null) {
+            return "";
+        }
+        int start = Math.min(selectionStart, selectionEnd);
+        int end = Math.max(selectionStart, selectionEnd);
+        return pdfFile.getPageText(selectionPage, start, end - start + 1);
+    }
+
+    private void showSelectionActionPopup() {
+        dismissSelectionActionPopup();
+        if (!hasTextSelection() || selectedText.isEmpty() || !callbacks.hasSelectionActionListener() || getWindowToken() == null) {
+            return;
+        }
+
+        RectF anchorBounds = getSelectionPopupAnchorBounds();
+        if (anchorBounds == null || !isSelectionAnchorVisibleOnScreen(anchorBounds)) {
+            return;
+        }
+
+        TextView actionView = createSelectionActionView();
+        PopupWindow popupWindow = new PopupWindow(actionView, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, false);
+        popupWindow.setTouchable(true);
+        popupWindow.setOutsideTouchable(false);
+        popupWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            popupWindow.setElevation(Util.getDP(getContext(), SELECTION_POPUP_ELEVATION_DP));
+        }
+
+        actionView.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+        int popupWidth = actionView.getMeasuredWidth();
+        int popupHeight = actionView.getMeasuredHeight();
+        int[] popupLocation = computeSelectionPopupLocation(anchorBounds, popupWidth, popupHeight);
+        if (popupLocation == null) {
+            return;
+        }
+
+        selectionActionPopup = popupWindow;
+        popupWindow.setOnDismissListener(() -> {
+            if (selectionActionPopup == popupWindow) {
+                selectionActionPopup = null;
+            }
+        });
+        popupWindow.showAtLocation(this, Gravity.NO_GRAVITY, popupLocation[0], popupLocation[1]);
+    }
+
+    private void dismissSelectionActionPopup() {
+        if (selectionActionPopup != null) {
+            selectionActionPopup.dismiss();
+            selectionActionPopup = null;
+        }
+    }
+
+    private TextView createSelectionActionView() {
+        TextView actionView = new TextView(getContext());
+        if (selectionPopupText != null) {
+            actionView.setText(selectionPopupText);
+        } else {
+            actionView.setText(R.string.pdfview_selection_copy_action);
+        }
+        actionView.setTextColor(selectionPopupTextColor);
+        actionView.setTextSize(SELECTION_POPUP_TEXT_SIZE_SP);
+        int horizontalPadding = Util.getDP(getContext(), SELECTION_POPUP_HORIZONTAL_PADDING_DP);
+        int verticalPadding = Util.getDP(getContext(), SELECTION_POPUP_VERTICAL_PADDING_DP);
+        actionView.setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(selectionPopupBackgroundColor);
+        background.setCornerRadius(Util.getDP(getContext(), SELECTION_POPUP_CORNER_RADIUS_DP));
+        actionView.setBackground(background);
+        actionView.setOnClickListener(v -> {
+            callbacks.callOnCopySelection(selectedText);
+            allowSelectionActionPopupAutoShow = false;
+            dismissSelectionActionPopup();
+        });
+        return actionView;
+    }
+
+    private void updateSelectionActionPopupPosition() {
+        if (selectionActionPopup == null || !selectionActionPopup.isShowing()) {
+            return;
+        }
+        if (!hasTextSelection() || selectedText.isEmpty()) {
+            dismissSelectionActionPopup();
+            return;
+        }
+        RectF anchorBounds = getSelectionPopupAnchorBounds();
+        if (anchorBounds == null || !isSelectionAnchorVisibleOnScreen(anchorBounds)) {
+            dismissSelectionActionPopup();
+            return;
+        }
+        View contentView = selectionActionPopup.getContentView();
+        if (contentView == null) {
+            dismissSelectionActionPopup();
+            return;
+        }
+        contentView.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+        int popupWidth = contentView.getMeasuredWidth();
+        int popupHeight = contentView.getMeasuredHeight();
+        int[] popupLocation = computeSelectionPopupLocation(anchorBounds, popupWidth, popupHeight);
+        if (popupLocation == null) {
+            dismissSelectionActionPopup();
+            return;
+        }
+        selectionActionPopup.update(popupLocation[0], popupLocation[1], -1, -1);
+    }
+
+    private void syncSelectionActionPopupWithViewVisibility() {
+        if (!hasTextSelection() || selectedText.isEmpty() || !callbacks.hasSelectionActionListener()) {
+            allowSelectionActionPopupAutoShow = false;
+            dismissSelectionActionPopup();
+            return;
+        }
+
+        if (!isShown() || !getGlobalVisibleRect(popupVisibleRect)) {
+            dismissSelectionActionPopup();
+            return;
+        }
+
+        RectF anchorBounds = getSelectionPopupAnchorBounds();
+        if (anchorBounds == null || !isSelectionAnchorVisibleOnScreen(anchorBounds)) {
+            dismissSelectionActionPopup();
+            return;
+        }
+
+        if (selectionActionPopup == null || !selectionActionPopup.isShowing()) {
+            if (allowSelectionActionPopupAutoShow) {
+                showSelectionActionPopup();
+            }
+            return;
+        }
+
+        updateSelectionActionPopupPosition();
+    }
+
+    private int[] computeSelectionPopupLocation(RectF anchorBounds, int popupWidth, int popupHeight) {
+        int margin = Util.getDP(getContext(), SELECTION_POPUP_MARGIN_DP);
+        int[] location = new int[2];
+        getLocationOnScreen(location);
+        float anchorCenterX = anchorBounds.centerX();
+        int desiredX = location[0] + Math.round(anchorCenterX - popupWidth / 2f);
+        int desiredY = location[1] + Math.round(anchorBounds.top - popupHeight - margin);
+
+        int minX = location[0] + margin;
+        int maxX = location[0] + getWidth() - popupWidth - margin;
+        int minY = location[1] + margin;
+        int maxY = location[1] + getHeight() - popupHeight - margin;
+
+        int popupX;
+        if (maxX < minX) {
+            popupX = location[0] + Math.round((getWidth() - popupWidth) / 2f);
+        } else {
+            popupX = Math.max(minX, Math.min(desiredX, maxX));
+        }
+
+        int popupY;
+        if (maxY < minY) {
+            popupY = location[1] + Math.round((getHeight() - popupHeight) / 2f);
+        } else {
+            popupY = Math.max(minY, Math.min(desiredY, maxY));
+        }
+
+        return new int[]{popupX, popupY};
+    }
+
+    private boolean isSelectionAnchorVisibleOnScreen(RectF anchorBounds) {
+        if (anchorBounds == null || !getGlobalVisibleRect(popupVisibleRect)) {
+            return false;
+        }
+        int[] location = new int[2];
+        getLocationOnScreen(location);
+        RectF anchorOnScreen = new RectF(anchorBounds);
+        anchorOnScreen.offset(location[0], location[1]);
+        RectF visibleRect = new RectF(popupVisibleRect);
+        return RectF.intersects(anchorOnScreen, visibleRect);
+    }
+
+    private RectF getSelectionPopupAnchorBounds() {
+        if (!hasTextSelection() || pdfFile == null) {
+            return null;
+        }
+
+        int page = selectionPage;
+        if (page < 0 || page >= pdfFile.getPagesCount()) {
+            return null;
+        }
+
+        SizeF pageSize = pdfFile.getScaledPageSize(page, zoom);
+        int pageX;
+        int pageY;
+        if (swipeVertical) {
+            pageX = (int) pdfFile.getSecondaryPageOffset(page, zoom);
+            pageY = (int) pdfFile.getPageOffset(page, zoom);
+        } else {
+            pageY = (int) pdfFile.getSecondaryPageOffset(page, zoom);
+            pageX = (int) pdfFile.getPageOffset(page, zoom);
+        }
+
+        int start = Math.min(selectionStart, selectionEnd);
+        int end = Math.max(selectionStart, selectionEnd);
+        List<RectF> lineRects = buildLineSelectionRects(page, pageX, pageY, (int) pageSize.getWidth(), (int) pageSize.getHeight(), start, end);
+        if (lineRects.isEmpty()) {
+            return null;
+        }
+
+        RectF anchor = new RectF(lineRects.get(0));
+        for (int i = 1; i < lineRects.size(); i++) {
+            anchor.union(lineRects.get(i));
+        }
+        return new RectF(anchor.left + currentXOffset, anchor.top + currentYOffset, anchor.right + currentXOffset, anchor.bottom + currentYOffset);
+    }
+
+    private SelectionHit getSelectionHit(float x, float y) {
+        if (pdfFile == null) {
+            return null;
+        }
+
+        float mappedX = -currentXOffset + x;
+        float mappedY = -currentYOffset + y;
+        int page = pdfFile.getPageAtOffset(swipeVertical ? mappedY : mappedX, zoom);
+        if (page < 0 || page >= pdfFile.getPagesCount()) {
+            return null;
+        }
+
+        SizeF scaledPageSize = pdfFile.getScaledPageSize(page, zoom);
+        if (scaledPageSize.getWidth() <= 0 || scaledPageSize.getHeight() <= 0) {
+            return null;
+        }
+        PageOffsets offsets = computePageOffsets(page);
+        float pageLeft = offsets.x;
+        float pageTop = offsets.y;
+
+        int pageX = (int) pageLeft;
+        int pageY = (int) pageTop;
+        int charIndexFromDevice = findCharIndexFromDeviceBoxes(page, mappedX, mappedY, pageX, pageY, scaledPageSize);
+        if (charIndexFromDevice >= 0) {
+            return new SelectionHit(page, charIndexFromDevice);
+        }
+
+        float localX = mappedX - pageLeft;
+        float localY = mappedY - pageTop;
+        if (localX < 0 || localY < 0 || localX > scaledPageSize.getWidth() || localY > scaledPageSize.getHeight()) {
+            return null;
+        }
+
+        Size originalPageSize = pdfFile.getOriginalPageSize(page);
+        if (originalPageSize.getWidth() <= 0 || originalPageSize.getHeight() <= 0) {
+            return null;
+        }
+
+        double pageCoordX = (localX / scaledPageSize.getWidth()) * originalPageSize.getWidth();
+        double pageCoordY = (localY / scaledPageSize.getHeight()) * originalPageSize.getHeight();
+        double toleranceX = Math.max(1d, originalPageSize.getWidth() / scaledPageSize.getWidth());
+        double toleranceY = Math.max(1d, originalPageSize.getHeight() / scaledPageSize.getHeight());
+        int charIndex = pdfFile.getCharIndexAtCoord(page, pageCoordX, pageCoordY, toleranceX, toleranceY);
+        if (charIndex < 0) {
+            double invertedPageCoordY = originalPageSize.getHeight() - pageCoordY;
+            charIndex = pdfFile.getCharIndexAtCoord(page, pageCoordX, invertedPageCoordY, toleranceX, toleranceY);
+            if (charIndex < 0) {
+                charIndex = findCharIndexFromBoxes(page, (float) pageCoordX, (float) pageCoordY, originalPageSize.getHeight());
+            }
+        }
+        if (charIndex < 0) {
+            return null;
+        }
+
+        return new SelectionHit(page, charIndex);
+    }
+
+    private int findCharIndexFromDeviceBoxes(int page, float mappedX, float mappedY, int pageX, int pageY, SizeF pageSize) {
+        int textCount = pdfFile.getPageTextCount(page);
+        if (textCount <= 0) {
+            return INVALID_CHAR_INDEX;
+        }
+
+        int bestIndex = INVALID_CHAR_INDEX;
+        float bestDistance = Float.MAX_VALUE;
+        for (int i = 0; i < textCount; i++) {
+            RectF charBox = pdfFile.getCharBox(page, i);
+            if (charBox == null) {
+                continue;
+            }
+             RectF mappedRect = pdfFile.mapRectToDevice(page, pageX, pageY, (int) pageSize.getWidth(), (int) pageSize.getHeight(), charBox);
+             if (mappedRect == null) {
+                 continue;
+             }
+             mappedRect.sort();
+             if (mappedRect.contains(mappedX, mappedY)) {
+                 return i;
+             }
+            float centerX = (mappedRect.left + mappedRect.right) / 2f;
+            float centerY = (mappedRect.top + mappedRect.bottom) / 2f;
+            float dx = centerX - mappedX;
+            float dy = centerY - mappedY;
+            float distance = dx * dx + dy * dy;
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = i;
+            }
+        }
+
+        if (bestDistance > MAX_FALLBACK_DEVICE_DISTANCE_SQ) {
+            return INVALID_CHAR_INDEX;
+        }
+        return bestIndex;
+    }
+
+    private int findCharIndexFromBoxes(int page, float pageCoordX, float pageCoordY, int pageHeight) {
+        int textCount = pdfFile.getPageTextCount(page);
+        if (textCount <= 0) {
+            return INVALID_CHAR_INDEX;
+        }
+
+        int bestIndex = INVALID_CHAR_INDEX;
+        float bestDistance = Float.MAX_VALUE;
+        float[] candidateY = new float[]{pageCoordY, pageHeight - pageCoordY};
+        for (float y : candidateY) {
+            for (int i = 0; i < textCount; i++) {
+                RectF charBox = pdfFile.getCharBox(page, i);
+                if (charBox == null) {
+                    continue;
+                }
+                charBox.sort();
+                if (charBox.contains(pageCoordX, y)) {
+                    return i;
+                }
+                float centerX = (charBox.left + charBox.right) / 2f;
+                float centerY = (charBox.top + charBox.bottom) / 2f;
+                float dx = centerX - pageCoordX;
+                float dy = centerY - y;
+                float distance = dx * dx + dy * dy;
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestIndex = i;
+                }
+            }
+        }
+        if (bestDistance > MAX_FALLBACK_CHAR_DISTANCE_SQ) {
+            return INVALID_CHAR_INDEX;
+        }
+        return bestIndex;
+    }
+
+    private static class PageOffsets {
+        final int x;
+        final int y;
+
+        PageOffsets(int x, int y) {
+            this.x = x;
+            this.y = y;
+        }
+    }
+
+    private PageOffsets computePageOffsets(int page) {
+        int pageX;
+        int pageY;
+        if (swipeVertical) {
+            pageX = (int) pdfFile.getSecondaryPageOffset(page, zoom);
+            pageY = (int) pdfFile.getPageOffset(page, zoom);
+        } else {
+            pageY = (int) pdfFile.getSecondaryPageOffset(page, zoom);
+            pageX = (int) pdfFile.getPageOffset(page, zoom);
+        }
+        return new PageOffsets(pageX, pageY);
+    }
+
+    private static class SelectionSetup {
+        final int page;
+        final SizeF pageSize;
+        final int pageX;
+        final int pageY;
+
+        SelectionSetup(int page, SizeF pageSize, int pageX, int pageY) {
+            this.page = page;
+            this.pageSize = pageSize;
+            this.pageX = pageX;
+            this.pageY = pageY;
+        }
+    }
+
+    private SelectionSetup validateAndSetupSelection() {
+        if (!hasTextSelection() || pdfFile == null) {
+            return null;
+        }
+
+        int page = selectionPage;
+        if (page < 0 || page >= pdfFile.getPagesCount()) {
+            return null;
+        }
+
+        SizeF pageSize = pdfFile.getScaledPageSize(page, zoom);
+        PageOffsets offsets = computePageOffsets(page);
+        return new SelectionSetup(page, pageSize, offsets.x, offsets.y);
+    }
+
+    private static class SelectionHit {
+        final int page;
+        final int charIndex;
+
+        SelectionHit(int page, int charIndex) {
+            this.page = page;
+            this.charIndex = charIndex;
+        }
+    }
+
     /**
      * Use an asset file as the pdf source
      */
@@ -1574,6 +2401,15 @@ public class PDFView extends RelativeLayout {
         private boolean pageSnap = false;
 
         private boolean nightMode = false;
+        private boolean textSelectionEnabled = false;
+        private boolean selectionPopupEnabled = true;
+        private OnSelectionActionListener onSelectionActionListener;
+        private OnSelectionChangeListener onSelectionChangeListener;
+        private Integer selectionHandleColor = null;
+        private Integer selectionHighlightColor = null;
+        private Integer selectionPopupBackgroundColor = null;
+        private Integer selectionPopupTextColor = null;
+        private CharSequence selectionPopupText = null;
         private boolean touchPriority = false;
         private boolean useBestQuality = false;
         private float thumbnailRatio = Constants.THUMBNAIL_RATIO;
@@ -1747,6 +2583,51 @@ public class PDFView extends RelativeLayout {
             return this;
         }
 
+        public Configurator enableTextSelection(boolean textSelectionEnabled) {
+            this.textSelectionEnabled = textSelectionEnabled;
+            return this;
+        }
+
+        public Configurator onSelectionAction(OnSelectionActionListener onSelectionActionListener) {
+            this.onSelectionActionListener = onSelectionActionListener;
+            return this;
+        }
+
+        public Configurator onSelectionChange(OnSelectionChangeListener onSelectionChangeListener) {
+            this.onSelectionChangeListener = onSelectionChangeListener;
+            return this;
+        }
+
+        public Configurator selectionPopupEnabled(boolean selectionPopupEnabled) {
+            this.selectionPopupEnabled = selectionPopupEnabled;
+            return this;
+        }
+
+        public Configurator selectionHandleColor(@ColorInt int color) {
+            this.selectionHandleColor = color;
+            return this;
+        }
+
+        public Configurator selectionHighlightColor(@ColorInt int color) {
+            this.selectionHighlightColor = color;
+            return this;
+        }
+
+        public Configurator selectionPopupBackgroundColor(@ColorInt int color) {
+            this.selectionPopupBackgroundColor = color;
+            return this;
+        }
+
+        public Configurator selectionPopupTextColor(@ColorInt int color) {
+            this.selectionPopupTextColor = color;
+            return this;
+        }
+
+        public Configurator selectionPopupText(CharSequence text) {
+            this.selectionPopupText = text;
+            return this;
+        }
+
         public Configurator disableLongPress() {
             PDFView.this.dragPinchManager.disableLongPress();
             return this;
@@ -1807,8 +2688,17 @@ public class PDFView extends RelativeLayout {
             PDFView.this.callbacks.setOnLongPress(onLongPressListener);
             PDFView.this.callbacks.setOnPageError(onPageErrorListener);
             PDFView.this.callbacks.setLinkHandler(linkHandler);
+            PDFView.this.callbacks.setOnSelectionActionListener(onSelectionActionListener);
+            PDFView.this.callbacks.setOnSelectionChangeListener(onSelectionChangeListener);
             PDFView.this.setSwipeEnabled(enableSwipe);
             PDFView.this.setNightMode(nightMode);
+            PDFView.this.enableTextSelection(textSelectionEnabled);
+            PDFView.this.setSelectionPopupEnabled(selectionPopupEnabled);
+            if (selectionHandleColor != null) PDFView.this.setSelectionHandleColor(selectionHandleColor);
+            if (selectionHighlightColor != null) PDFView.this.setSelectionHighlightColor(selectionHighlightColor);
+            if (selectionPopupBackgroundColor != null) PDFView.this.setSelectionPopupBackgroundColor(selectionPopupBackgroundColor);
+            if (selectionPopupTextColor != null) PDFView.this.setSelectionPopupTextColor(selectionPopupTextColor);
+            if (selectionPopupText != null) PDFView.this.setSelectionPopupText(selectionPopupText);
             PDFView.this.enableDoubleTap(enableDoubletap);
             PDFView.this.setDefaultPage(defaultPage);
             PDFView.this.setSwipeVertical(!swipeHorizontal);
