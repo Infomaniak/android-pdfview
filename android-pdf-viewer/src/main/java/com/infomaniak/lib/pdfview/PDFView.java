@@ -1017,7 +1017,7 @@ public class PDFView extends RelativeLayout {
         }
     }
 
-     private float estimateLineGapThreshold(java.util.List<RectF> boxes) {
+     private float estimateLineGapThreshold(List<RectF> boxes) {
          if (boxes.size() < 2) {
              return 5f;
          }

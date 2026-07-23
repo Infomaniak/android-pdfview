@@ -256,7 +256,8 @@ class DragPinchManager implements
                 draggingStartHandle = true;
                 setSelectionTouchPriority(true);
                 return;
-            } else if (pdfView.isEndHandleTouched(e.getX(), e.getY())) {
+            }
+            if (pdfView.isEndHandleTouched(e.getX(), e.getY())) {
                 draggingSelectionHandle = true;
                 draggingStartHandle = false;
                 setSelectionTouchPriority(true);
@@ -366,19 +367,18 @@ class DragPinchManager implements
         }
 
         // Check for handle dragging on ACTION_DOWN
-        if (event.getAction() == MotionEvent.ACTION_DOWN) {
-            if (pdfView.hasTextSelection()) {
-                if (pdfView.isStartHandleTouched(event.getX(), event.getY())) {
-                    draggingSelectionHandle = true;
-                    draggingStartHandle = true;
-                    setSelectionTouchPriority(true);
-                    return true;
-                } else if (pdfView.isEndHandleTouched(event.getX(), event.getY())) {
-                    draggingSelectionHandle = true;
-                    draggingStartHandle = false;
-                    setSelectionTouchPriority(true);
-                    return true;
-                }
+        if (event.getAction() == MotionEvent.ACTION_DOWN && pdfView.hasTextSelection()) {
+            if (pdfView.isStartHandleTouched(event.getX(), event.getY())) {
+                draggingSelectionHandle = true;
+                draggingStartHandle = true;
+                setSelectionTouchPriority(true);
+                return true;
+            }
+            if (pdfView.isEndHandleTouched(event.getX(), event.getY())) {
+                draggingSelectionHandle = true;
+                draggingStartHandle = false;
+                setSelectionTouchPriority(true);
+                return true;
             }
         }
 
