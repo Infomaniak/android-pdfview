@@ -122,6 +122,7 @@ public class PDFView extends RelativeLayout {
     private static final int SELECTION_POPUP_VERTICAL_PADDING_DP = 10;
     private static final int SELECTION_POPUP_CORNER_RADIUS_DP = 12;
     private static final int SELECTION_POPUP_ELEVATION_DP = 6;
+    private static final float SELECTION_POPUP_TEXT_SIZE_SP = 14f;
 
     public static final float DEFAULT_MAX_SCALE = 3.0f;
     public static final float DEFAULT_MID_SCALE = 1.75f;
@@ -925,7 +926,7 @@ public class PDFView extends RelativeLayout {
     }
 
     private java.util.List<RectF> buildLineSelectionRects(int page, int pageX, int pageY, int pageWidth, int pageHeight, int start, int end) {
-        java.util.List<RectF> lineRects = new java.util.ArrayList<>();
+        java.util.List<RectF> lineRects = new ArrayList<>();
         if (start > end || start < 0) {
             return lineRects;
         }
@@ -1788,42 +1789,35 @@ public class PDFView extends RelativeLayout {
          return selectionEndHandleBounds != null && selectionEndHandleBounds.contains(x, y);
      }
 
-     boolean extendSelectionFromStart(float x, float y) {
-         if (!hasTextSelection()) {
-             return false;
-         }
-         SelectionHit hit = getSelectionHit(x, y);
-         if (hit == null || hit.page != selectionPage) {
-             return false;
-         }
-         if (selectionStart != hit.charIndex) {
-             selectionStart = hit.charIndex;
-             selectedText = computeSelectedText();
-             updateSelectionActionPopupPosition();
-             redraw();
-             return true;
-         }
-         updateSelectionActionPopupPosition();
-         return false;
+     void extendSelectionFromStart(float x, float y) {
+        extendSelection(x, y, true);
      }
 
-     boolean extendSelectionFromEnd(float x, float y) {
+     void extendSelectionFromEnd(float x, float y) {
+        extendSelection(x, y, false);
+     }
+
+     private void extendSelection(float x, float y, boolean fromStartHandle) {
          if (!hasTextSelection()) {
-             return false;
+             return;
          }
          SelectionHit hit = getSelectionHit(x, y);
          if (hit == null || hit.page != selectionPage) {
-             return false;
+             return;
          }
-         if (selectionEnd != hit.charIndex) {
-             selectionEnd = hit.charIndex;
+         int currentIndex = fromStartHandle ? selectionStart : selectionEnd;
+         if (currentIndex != hit.charIndex) {
+             if (fromStartHandle) {
+                 selectionStart = hit.charIndex;
+             } else {
+                 selectionEnd = hit.charIndex;
+             }
              selectedText = computeSelectedText();
              updateSelectionActionPopupPosition();
              redraw();
-             return true;
+             return;
          }
          updateSelectionActionPopupPosition();
-         return false;
      }
 
     boolean startTextSelection(float x, float y) {
@@ -1956,7 +1950,7 @@ public class PDFView extends RelativeLayout {
             actionView.setText(R.string.pdfview_selection_copy_action);
         }
         actionView.setTextColor(selectionPopupTextColor);
-        actionView.setTextSize(14);
+        actionView.setTextSize(SELECTION_POPUP_TEXT_SIZE_SP);
         int horizontalPadding = Util.getDP(getContext(), SELECTION_POPUP_HORIZONTAL_PADDING_DP);
         int verticalPadding = Util.getDP(getContext(), SELECTION_POPUP_VERTICAL_PADDING_DP);
         actionView.setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding);
