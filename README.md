@@ -241,6 +241,11 @@ void setMidZoom(float zoom);
 void setMaxZoom(float zoom);
 ```
 
+Pinch zoom is constrained to the `0.3f`–`100f` range. Requested minimum and maximum values are
+clamped to that range while processing a pinch gesture. If the resulting maximum is below the
+resulting minimum, the effective maximum is raised to the effective minimum, so the pinch range
+remains valid. The same behavior applies to `Configurator#zoom(float, float, float)`.
+
 ## Possible questions
 ### Why resulting apk is so big?
 Android PdfViewer depends on PdfiumAndroid, which is set of native libraries (almost 16 MB) for many architectures.

@@ -1552,6 +1552,15 @@ public class PDFView extends RelativeLayout {
         return minZoom;
     }
 
+    /**
+     * Sets the requested minimum zoom level.
+     *
+     * <p>Pinch zoom is constrained to the {@code [0.3f, 100f]} range. Values outside this
+     * range are clamped while processing a pinch gesture. If the resulting minimum is greater
+     * than the resulting maximum, the effective maximum is raised to the effective minimum.</p>
+     *
+     * @param minZoom requested minimum zoom level
+     */
     public void setMinZoom(float minZoom) {
         this.minZoom = minZoom;
     }
@@ -1568,6 +1577,15 @@ public class PDFView extends RelativeLayout {
         return maxZoom;
     }
 
+    /**
+     * Sets the requested maximum zoom level.
+     *
+     * <p>Pinch zoom is constrained to the {@code [0.3f, 100f]} range. Values outside this
+     * range are clamped while processing a pinch gesture. If the resulting maximum is less
+     * than the resulting minimum, the effective maximum is raised to the effective minimum.</p>
+     *
+     * @param maxZoom requested maximum zoom level
+     */
     public void setMaxZoom(float maxZoom) {
         this.maxZoom = maxZoom;
     }
@@ -2545,6 +2563,18 @@ public class PDFView extends RelativeLayout {
             return this;
         }
 
+        /**
+         * Sets the requested minimum, medium and maximum zoom levels.
+         *
+         * <p>Pinch zoom is constrained to the {@code [0.3f, 100f]} range. Values outside this
+         * range are clamped while processing a pinch gesture. If the resulting maximum is less
+         * than the resulting minimum, the effective maximum is raised to the effective minimum.</p>
+         *
+         * @param minZoom requested minimum zoom level
+         * @param midZoom requested medium zoom level used by double tap
+         * @param maxZoom requested maximum zoom level
+         * @return this configurator
+         */
         public Configurator zoom(float minZoom, float midZoom, float maxZoom) {
             this.minZoom = minZoom;
             this.midZoom = midZoom;
