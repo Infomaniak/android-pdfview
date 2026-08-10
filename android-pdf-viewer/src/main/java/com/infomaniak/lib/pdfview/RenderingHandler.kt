@@ -81,6 +81,13 @@ internal class RenderingHandler(
 
     fun cancelAllTasks() {
         renderingGeneration++
+        cancelPendingTasks()
+    }
+
+    /**
+     * Keeps an in-progress task eligible for display when only the viewport moved.
+     */
+    fun cancelPendingTasks() {
         removeMessages(MSG_RENDER_TASK)
     }
 
@@ -88,15 +95,15 @@ internal class RenderingHandler(
         val task = message.obj as RenderingTask
         runCatching {
             proceed(task)?.let { pagePart ->
-                if (task.renderingGeneration != renderingGeneration) {
-                    pagePart.renderedBitmap.recycle()
-                } else {
-                    post {
-                        if (running && task.renderingGeneration == renderingGeneration) {
-                            onBitmapRendered(pagePart, task.isForPrinting)
-                        } else {
-                            pagePart.renderedBitmap.recycle()
-                        }
+                post {
+                    if (
+                        running &&
+                        task.renderingGeneration == renderingGeneration &&
+                        task.renderingZoom == zoom
+                    ) {
+                        onBitmapRendered(pagePart, task.isForPrinting)
+                    } else {
+                        pagePart.renderedBitmap.recycle()
                     }
                 }
             }
