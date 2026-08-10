@@ -28,6 +28,7 @@ import com.infomaniak.lib.pdfview.model.PagePart;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 
@@ -61,6 +62,9 @@ class CacheManager {
 
     public void cachePart(PagePart part) {
         synchronized (passiveActiveLock) {
+            removePartsAtSameLocation(passiveCache, part);
+            removePartsAtSameLocation(activeCache, part);
+
             // If cache too big, remove and recycle
             makeAFreeSpace();
 
@@ -100,19 +104,19 @@ class CacheManager {
         }
     }
 
-    public boolean upPartIfContained(int page, RectF pageRelativeBounds, int toOrder) {
+    public boolean upPartIfContained(int page, RectF pageRelativeBounds, int toOrder, float renderingZoom) {
         PagePart fakePart = new PagePart(page, null, pageRelativeBounds, false, 0);
 
         PagePart found;
         synchronized (passiveActiveLock) {
-            if ((found = find(passiveCache, fakePart)) != null) {
+            if ((found = find(passiveCache, fakePart, renderingZoom)) != null) {
                 passiveCache.remove(found);
                 found.setCacheOrder(toOrder);
                 activeCache.offer(found);
                 return true;
             }
 
-            return find(activeCache, fakePart) != null;
+            return find(activeCache, fakePart, renderingZoom) != null;
         }
     }
 
@@ -135,6 +139,26 @@ class CacheManager {
         PagePart part = cache.poll();
         if (part != null) {
             part.getRenderedBitmap().recycle();
+        }
+    }
+
+    @Nullable
+    private static PagePart find(PriorityQueue<PagePart> vector, PagePart fakePart, float renderingZoom) {
+        for (PagePart part : vector) {
+            if (part.equals(fakePart) && Float.compare(part.getRenderingZoom(), renderingZoom) == 0) {
+                return part;
+            }
+        }
+        return null;
+    }
+
+    private void removePartsAtSameLocation(PriorityQueue<PagePart> cache, PagePart newPart) {
+        for (Iterator<PagePart> iterator = cache.iterator(); iterator.hasNext(); ) {
+            PagePart existingPart = iterator.next();
+            if (existingPart != newPart && existingPart.equals(newPart)) {
+                iterator.remove();
+                existingPart.getRenderedBitmap().recycle();
+            }
         }
     }
 
