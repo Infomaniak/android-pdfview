@@ -22,7 +22,7 @@ Add to _build.gradle_:
 allprojects {
     repositories {
         ...
-        maven { url 'https://jitpack.io' }'
+        maven { url 'https://maven.infomaniak.app/releases' }
         mavenCentral()
         ...
     }
@@ -35,14 +35,14 @@ or _build.gradle.kts_:
 dependencyResolutionManagement {
     repositories {
         ...
-        maven(url = "https://jitpack.io")
+        maven(url = "https://maven.infomaniak.app/releases")
         mavenCentral()
         ...
     }
 }
 ```
 
-`implementation 'com.github.Infomaniak:android-pdfview:3.2.13`
+`implementation("com.infomaniak.pdfview:android-pdfview:3.2.18")`
 
 ## ProGuard
 If you are using ProGuard, add following rule to proguard config file:

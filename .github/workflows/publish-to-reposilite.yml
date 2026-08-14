@@ -1,0 +1,49 @@
+name: Publish to Reposilite
+
+on:
+  workflow_dispatch:
+    inputs:
+      acknowledgement:
+        description: |
+          WARNING: Publishing a version to Reposilite is irrevocable.
+          Do you confirm (Yes/no):
+          1. The version is CORRECT, and is NOT a SNAPSHOT
+          2. You are running this workflow on the matching release tag
+          3. You validated publication to snapshots beforehand
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+
+jobs:
+  build:
+    runs-on: [ self-hosted, Android ]
+    steps:
+      - name: Check acknowledgement
+        env:
+          ACKNOWLEDGEMENT: ${{ github.event.inputs.acknowledgement }}
+        run: test "$ACKNOWLEDGEMENT" = "Yes" || (echo "Acknowledgement missing" && exit 1)
+
+      - name: Checkout sources
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Publish artifacts
+        run: ./gradlew publishAllPublicationsToReposiliteRepository
+env:
+  GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4g -Dfile.encoding=UTF-8"
+  reposiliteUsername: ${{ secrets.REPOSILITE_USERNAME }}
+  reposilitePassword: ${{ secrets.REPOSILITE_PASSWORD }}
+  GPG_key_id: ${{ secrets.GPG_KEY_ID }}
+  GPG_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+  GPG_private_password: ${{ secrets.GPG_PRIVATE_PASSWORD }}
