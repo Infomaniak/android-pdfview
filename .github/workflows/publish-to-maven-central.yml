@@ -22,7 +22,9 @@ jobs:
     runs-on: [ self-hosted, Android ]
     steps:
       - name: Check acknowledgement
-        run: test "${{ github.event.inputs.acknowledgement }}" = "Yes" || (echo "Acknowledgement missing" && exit 1)
+        env:
+          ACKNOWLEDGEMENT: ${{ github.event.inputs.acknowledgement }}
+        run: test "$ACKNOWLEDGEMENT" = "Yes" || (echo "Acknowledgement missing" && exit 1)
 
       - name: Checkout sources
         uses: actions/checkout@v4.2.2

@@ -111,16 +111,19 @@ afterEvaluate {
 val gpgKeyId = providers.gradleProperty("GPG_key_id")
     .orElse(providers.environmentVariable("GPG_key_id"))
     .orNull
+    ?.takeIf { it.isNotBlank() }
 val gpgPrivateKey = providers.gradleProperty("GPG_private_key")
     .orElse(providers.environmentVariable("GPG_private_key"))
     .orNull
+    ?.takeIf { it.isNotBlank() }
 val gpgPassword = providers.gradleProperty("GPG_private_password")
     .orElse(providers.environmentVariable("GPG_private_password"))
     .orNull
+    ?.takeIf { it.isNotBlank() }
 
 signing {
     val isPublishTask = gradle.startParameter.taskNames.any {
-        it.contains("PublishToReposiliteRepository") || it.contains("CentralPortal") || it.contains("CentralSnapshots")
+        it.contains("ToReposiliteRepository") || it.contains("CentralPortal") || it.contains("CentralSnapshots")
     }
     if (gpgKeyId != null && gpgPrivateKey != null && gpgPassword != null) {
         useInMemoryPgpKeys(gpgKeyId, gpgPrivateKey.replace('#', '\n'), gpgPassword)
