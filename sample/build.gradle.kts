@@ -13,8 +13,6 @@ repositories {
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlinAndroid)
-    alias(libs.plugins.kapt)
 }
 
 val libMinSdk: Int by rootProject.extra
@@ -37,7 +35,12 @@ android {
         targetCompatibility = javaVersion
     }
 
-    kotlinOptions { jvmTarget = javaVersion.toString() }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(javaVersion.toString())
+    }
 }
 
 dependencies {
@@ -48,5 +51,4 @@ dependencies {
     implementation(libs.material)
     implementation(libs.pdfium)
 
-    annotationProcessor(libs.androidannotations)
 }
