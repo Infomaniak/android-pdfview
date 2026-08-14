@@ -16,11 +16,16 @@
  */
 
 buildscript {
+    // Appending -SNAPSHOT is triggered by passing -Psnapshot to Gradle (used by the snapshot
+    // publishing workflow), so the version doesn't need to be typed in by hand.
+    val baseVersionName = "3.2.18"
 
     extra.apply {
         set("libMinSdk", 23)
         set("libCompileSdk", 36)
-        set("libVersionName", "3.2.17")
+        set("libGroupId", "com.infomaniak.pdfview")
+        set("libVersionName", if (project.hasProperty("snapshot")) "$baseVersionName-SNAPSHOT" else baseVersionName)
+        set("libArtifactId", "android-pdfview")
         set("javaVersion", JavaVersion.VERSION_17)
     }
 
@@ -30,11 +35,28 @@ buildscript {
     }
 }
 
-apply(plugin = "maven-publish")
-
 plugins {
+    id("maven-publish")
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.nmcp.aggregation)
+}
+
+// Aggregates the published android-pdf-viewer module into a single Maven Central deployment.
+nmcpAggregation {
+    centralPortal {
+        username = providers.gradleProperty("ossrhUsername")
+            .orElse(providers.environmentVariable("ossrhUsername"))
+            .orNull
+        password = providers.gradleProperty("ossrhPassword")
+            .orElse(providers.environmentVariable("ossrhPassword"))
+            .orNull
+        publishingType = "AUTOMATIC"
+    }
+}
+
+dependencies {
+    nmcpAggregation(project(":android-pdf-viewer"))
 }
 
 allprojects {
@@ -42,5 +64,15 @@ allprojects {
         google()
         // mavenLocal()
         mavenCentral()
+        maven {
+            name = "infomaniakReposiliteRepository"
+            url = uri("https://maven.infomaniak.app/releases")
+            content { includeGroup("com.infomaniak.pdfiumandroid") }
+        }
+        maven {
+            name = "infomaniakReposiliteRepositorySnapshots"
+            url = uri("https://maven.infomaniak.app/snapshots")
+            content { includeGroup("com.infomaniak.pdfiumandroid") }
+        }
     }
 }
