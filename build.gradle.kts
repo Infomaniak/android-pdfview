@@ -22,7 +22,7 @@ buildscript {
 
     extra.apply {
         set("libMinSdk", 23)
-        set("libCompileSdk", 36)
+        set("libCompileSdk", 37)
         set("libGroupId", "com.infomaniak.pdfview")
         set("libVersionName", if (project.hasProperty("snapshot")) "$baseVersionName-SNAPSHOT" else baseVersionName)
         set("libArtifactId", "android-pdfview")
