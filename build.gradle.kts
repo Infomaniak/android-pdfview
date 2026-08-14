@@ -20,7 +20,7 @@ buildscript {
     extra.apply {
         set("libMinSdk", 23)
         set("libCompileSdk", 36)
-        set("libVersionName", "3.2.17")
+        set("libVersionName", "3.2.18-vte-1")
         set("javaVersion", JavaVersion.VERSION_17)
     }
 

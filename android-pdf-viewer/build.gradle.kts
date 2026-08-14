@@ -1,8 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
     id("maven-publish")
-    alias(libs.plugins.kotlinAndroid)
-    alias(libs.plugins.kapt)
 }
 
 val libMinSdk: Int by rootProject.extra
@@ -29,8 +27,11 @@ android {
         targetCompatibility = javaVersion
     }
 
-    kotlinOptions {
-        jvmTarget = javaVersion.toString()
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(javaVersion.toString())
     }
 }
 
