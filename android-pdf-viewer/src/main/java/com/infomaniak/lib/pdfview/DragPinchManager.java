@@ -19,6 +19,7 @@ package com.infomaniak.lib.pdfview;
 
 import static com.infomaniak.lib.pdfview.util.Constants.Pinch.MAXIMUM_ZOOM;
 import static com.infomaniak.lib.pdfview.util.Constants.Pinch.MINIMUM_ZOOM;
+import static com.infomaniak.lib.pdfview.util.MathUtils.limit;
 import static com.infomaniak.lib.pdfview.util.TouchUtils.DIRECTION_SCROLLING_LEFT;
 import static com.infomaniak.lib.pdfview.util.TouchUtils.DIRECTION_SCROLLING_RIGHT;
 
@@ -336,8 +337,8 @@ class DragPinchManager implements
     public boolean onScale(ScaleGestureDetector detector) {
         float dr = detector.getScaleFactor();
         float wantedZoom = pdfView.getZoom() * dr;
-        float minZoom = Math.min(MINIMUM_ZOOM, pdfView.getMinZoom());
-        float maxZoom = Math.max(MAXIMUM_ZOOM, pdfView.getMaxZoom());
+        float minZoom = limit(pdfView.getMinZoom(), MINIMUM_ZOOM, MAXIMUM_ZOOM);
+        float maxZoom = limit(pdfView.getMaxZoom(), minZoom, MAXIMUM_ZOOM);
         if (wantedZoom < minZoom) {
             dr = minZoom / pdfView.getZoom();
         } else if (wantedZoom > maxZoom) {
