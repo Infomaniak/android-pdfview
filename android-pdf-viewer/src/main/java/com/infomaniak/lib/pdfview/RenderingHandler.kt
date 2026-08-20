@@ -50,6 +50,7 @@ internal class RenderingHandler(
         renderingSize: RenderingSize,
         thumbnail: Boolean,
         cacheOrder: Int,
+        renderingZoom: Float,
         bestQuality: Boolean,
         annotationRendering: Boolean,
         isForPrinting: Boolean,
@@ -59,6 +60,7 @@ internal class RenderingHandler(
             page,
             thumbnail,
             cacheOrder,
+            renderingZoom,
             bestQuality,
             annotationRendering,
             isForPrinting,
@@ -140,7 +142,8 @@ internal class RenderingHandler(
             render,
             renderingTask.renderingSize.bounds,
             renderingTask.thumbnail,
-            renderingTask.cacheOrder
+            renderingTask.cacheOrder,
+            renderingTask.renderingZoom,
         )
     }
 
@@ -165,6 +168,7 @@ internal class RenderingHandler(
         var page: Int,
         var thumbnail: Boolean,
         var cacheOrder: Int,
+        var renderingZoom: Float,
         var bestQuality: Boolean,
         var annotationRendering: Boolean,
         var isForPrinting: Boolean,

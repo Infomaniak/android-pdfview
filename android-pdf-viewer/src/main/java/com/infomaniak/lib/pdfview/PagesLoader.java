@@ -307,12 +307,13 @@ class PagesLoader {
         RectF pageRelativeBounds = new RectF(relX, relY, relX + relWidth, relY + relHeight);
 
         if (renderWidth > 0 && renderHeight > 0) {
-            if (!pdfView.cacheManager.upPartIfContained(page, pageRelativeBounds, cacheOrder)) {
+            if (!pdfView.cacheManager.upPartIfContained(page, pageRelativeBounds, cacheOrder, pdfView.getZoom())) {
                 pdfView.renderingHandler.addRenderingTask(
                         page,
                         new RenderingSize(renderWidth, renderHeight, pageRelativeBounds),
                         false,
                         cacheOrder,
+                        pdfView.getZoom(),
                         pdfView.isBestQuality(),
                         pdfView.isAnnotationRendering(),
                         false
@@ -336,6 +337,7 @@ class PagesLoader {
                     new RenderingSize(thumbnailWidth, thumbnailHeight, thumbnailRect),
                     true,
                     0,
+                    pdfView.getZoom(),
                     pdfView.isBestQuality(),
                     pdfView.isAnnotationRendering(),
                     isForPrinting

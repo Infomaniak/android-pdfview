@@ -32,13 +32,27 @@ public class PagePart {
 
     private int cacheOrder;
 
+    private final float renderingZoom;
+
     public PagePart(int page, Bitmap renderedBitmap, RectF pageRelativeBounds, boolean thumbnail, int cacheOrder) {
+        this(page, renderedBitmap, pageRelativeBounds, thumbnail, cacheOrder, Float.NaN);
+    }
+
+    public PagePart(
+            int page,
+            Bitmap renderedBitmap,
+            RectF pageRelativeBounds,
+            boolean thumbnail,
+            int cacheOrder,
+            float renderingZoom
+    ) {
         super();
         this.page = page;
         this.renderedBitmap = renderedBitmap;
         this.pageRelativeBounds = pageRelativeBounds;
         this.thumbnail = thumbnail;
         this.cacheOrder = cacheOrder;
+        this.renderingZoom = renderingZoom;
     }
 
     public int getCacheOrder() {
@@ -63,6 +77,10 @@ public class PagePart {
 
     public boolean isThumbnail() {
         return thumbnail;
+    }
+
+    public float getRenderingZoom() {
+        return renderingZoom;
     }
 
     @Override
