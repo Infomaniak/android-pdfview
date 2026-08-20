@@ -1,3 +1,8 @@
+## 3.2.19 (2026-08-20)
+* Fix pages being loaded even when scrolling
+* Fix recompute zone when zoom is different
+* Fix min max zoom not being set properly
+
 ## 3.2.18 (2026-08-14)
 * Add publishing to Reposilite and Maven Central
 
