@@ -24,7 +24,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.util.Log
-import com.infomaniak.lib.pdfview.RenderingHandler.RenderingTask
 import com.infomaniak.lib.pdfview.exception.PageRenderingException
 import com.infomaniak.lib.pdfview.model.PagePart
 
@@ -96,11 +95,9 @@ internal class RenderingHandler(
         runCatching {
             proceed(task)?.let { pagePart ->
                 post {
-                    if (
-                        running &&
+                    if (running &&
                         task.renderingGeneration == renderingGeneration &&
-                        task.renderingZoom == zoom
-                    ) {
+                        (task.isForPrinting || task.renderingZoom == zoom)) {
                         onBitmapRendered(pagePart, task.isForPrinting)
                     } else {
                         pagePart.renderedBitmap.recycle()
