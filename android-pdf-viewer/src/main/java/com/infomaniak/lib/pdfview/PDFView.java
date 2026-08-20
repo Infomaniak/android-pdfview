@@ -1082,8 +1082,8 @@ public class PDFView extends RelativeLayout {
             return;
         }
 
-        // Cancel all current tasks
-        renderingHandler.cancelAllTasks();
+        // Drop queued tasks but allow the task currently rendering to complete for the new viewport.
+        renderingHandler.cancelPendingTasks();
         cacheManager.makeANewSet();
 
         pagesLoader.loadPages();

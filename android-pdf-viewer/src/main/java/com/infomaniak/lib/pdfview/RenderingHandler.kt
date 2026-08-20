@@ -24,7 +24,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.util.Log
-import com.infomaniak.lib.pdfview.RenderingHandler.RenderingTask
 import com.infomaniak.lib.pdfview.exception.PageRenderingException
 import com.infomaniak.lib.pdfview.model.PagePart
 
@@ -81,6 +80,13 @@ internal class RenderingHandler(
 
     fun cancelAllTasks() {
         renderingGeneration++
+        cancelPendingTasks()
+    }
+
+    /**
+     * Keeps an in-progress task eligible for display when only the viewport moved.
+     */
+    fun cancelPendingTasks() {
         removeMessages(MSG_RENDER_TASK)
     }
 
@@ -88,15 +94,13 @@ internal class RenderingHandler(
         val task = message.obj as RenderingTask
         runCatching {
             proceed(task)?.let { pagePart ->
-                if (task.renderingGeneration != renderingGeneration) {
-                    pagePart.renderedBitmap.recycle()
-                } else {
-                    post {
-                        if (running && task.renderingGeneration == renderingGeneration) {
-                            onBitmapRendered(pagePart, task.isForPrinting)
-                        } else {
-                            pagePart.renderedBitmap.recycle()
-                        }
+                post {
+                    if (running &&
+                        task.renderingGeneration == renderingGeneration &&
+                        (task.isForPrinting || task.renderingZoom == zoom)) {
+                        onBitmapRendered(pagePart, task.isForPrinting)
+                    } else {
+                        pagePart.renderedBitmap.recycle()
                     }
                 }
             }
