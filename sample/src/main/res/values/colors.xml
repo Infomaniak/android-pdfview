@@ -20,4 +20,6 @@
     <color name="accent">@color/infomaniak</color>
     <color name="primary">@color/infomaniak</color>
     <color name="primaryDark">@color/infomaniakDark</color>
+    <color name="searchMatch">#66FFEB3B</color>
+    <color name="searchCurrentMatch">#B3FF9800</color>
 </resources>

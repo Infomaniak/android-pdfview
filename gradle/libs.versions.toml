@@ -6,7 +6,7 @@ agp = "9.3.2"
 kotlin = "2.4.10"
 material = "1.14.0"
 nmcp = "1.6.1"
-pdfium = "1.9.12"
+pdfium = "1.9.13"
 recyclerView = "1.4.0"
 viewpager2 = "1.1.0"
 

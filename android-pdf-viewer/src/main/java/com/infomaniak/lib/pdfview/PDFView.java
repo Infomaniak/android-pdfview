@@ -37,6 +37,7 @@ import android.os.Build;
 import android.os.HandlerThread;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.SparseArray;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -47,6 +48,7 @@ import android.widget.TextView;
 
 import androidx.annotation.ColorInt;
 import androidx.annotation.FloatRange;
+import androidx.annotation.Nullable;
 
 import com.infomaniak.lib.pdfview.exception.PageRenderingException;
 import com.infomaniak.lib.pdfview.link.DefaultLinkHandler;
@@ -63,10 +65,12 @@ import com.infomaniak.lib.pdfview.listener.OnPageErrorListener;
 import com.infomaniak.lib.pdfview.listener.OnPageScrollListener;
 import com.infomaniak.lib.pdfview.listener.OnReadyForPrintingListener;
 import com.infomaniak.lib.pdfview.listener.OnRenderListener;
+import com.infomaniak.lib.pdfview.listener.OnSearchResultListener;
 import com.infomaniak.lib.pdfview.listener.OnSelectionActionListener;
 import com.infomaniak.lib.pdfview.listener.OnSelectionChangeListener;
 import com.infomaniak.lib.pdfview.listener.OnTapListener;
 import com.infomaniak.lib.pdfview.model.PagePart;
+import com.infomaniak.lib.pdfview.model.SearchMatch;
 import com.infomaniak.lib.pdfview.scroll.ScrollHandle;
 import com.infomaniak.lib.pdfview.source.AssetSource;
 import com.infomaniak.lib.pdfview.source.ByteArraySource;
@@ -88,7 +92,9 @@ import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * It supports animations, zoom, cache, and swipe.
@@ -122,6 +128,8 @@ public class PDFView extends RelativeLayout {
     private static final int SELECTION_POPUP_CORNER_RADIUS_DP = 12;
     private static final int SELECTION_POPUP_ELEVATION_DP = 6;
     private static final float SELECTION_POPUP_TEXT_SIZE_SP = 14f;
+    private static final int DEFAULT_SEARCH_HIGHLIGHT_COLOR = 0x66FFEB3B;
+    private static final int DEFAULT_SEARCH_CURRENT_HIGHLIGHT_COLOR = 0xB3FF9800;
 
     public static final float DEFAULT_MAX_SCALE = 3.0f;
     public static final float DEFAULT_MID_SCALE = 1.75f;
@@ -220,6 +228,10 @@ public class PDFView extends RelativeLayout {
 
      private Paint selectionHandlePaint;
 
+     private Paint searchHighlightPaint;
+
+     private Paint searchCurrentHighlightPaint;
+
      /**
       * Paint object for drawing debug stuff
       */
@@ -250,6 +262,24 @@ public class PDFView extends RelativeLayout {
      private final Rect popupVisibleRect = new Rect();
      private final ViewTreeObserver.OnScrollChangedListener selectionPopupScrollChangedListener = this::syncSelectionActionPopupWithViewVisibility;
      private final ViewTreeObserver.OnGlobalLayoutListener selectionPopupGlobalLayoutListener = this::syncSelectionActionPopupWithViewVisibility;
+
+    /**
+     * Searches a text in the document, created by the first search of a document
+     */
+    private PdfTextSearcher textSearcher;
+    /**
+     * Whether there is a search, which can be running, have matches or have found nothing
+     */
+    private boolean hasSearch = false;
+    /**
+     * Matches of the last search, which are highlighted
+     */
+    private List<SearchMatch> searchMatches = Collections.emptyList();
+    /**
+     * Same matches as {@link #searchMatches}, by page of the document
+     */
+    private final SparseArray<List<SearchMatch>> searchMatchesByDocumentPage = new SparseArray<>();
+    private int currentSearchMatchIndex = -1;
 
     private int defaultPage = 0;
 
@@ -385,6 +415,10 @@ public class PDFView extends RelativeLayout {
          selectionHandlePaint = new Paint();
          selectionHandlePaint.setStyle(Style.FILL);
          selectionHandlePaint.setColor(selectionHandleColor);
+         searchHighlightPaint = new Paint();
+         searchHighlightPaint.setColor(DEFAULT_SEARCH_HIGHLIGHT_COLOR);
+         searchCurrentHighlightPaint = new Paint();
+         searchCurrentHighlightPaint.setColor(DEFAULT_SEARCH_CURRENT_HIGHLIGHT_COLOR);
          debugPaint = new Paint();
          debugPaint.setStyle(Style.STROKE);
 
@@ -556,6 +590,8 @@ public class PDFView extends RelativeLayout {
     public void recycle() {
         waitingDocumentConfigurator = null;
         dismissSelectionActionPopup();
+        // Before the document is disposed
+        resetSearch();
 
         animationManager.stopAll();
         dragPinchManager.disable();
@@ -814,6 +850,7 @@ public class PDFView extends RelativeLayout {
         }
          onDrawPagesNums.clear();
 
+         drawSearchMatches(canvas);
          drawTextSelection(canvas);
          drawSelectionHandles(canvas);
 
@@ -1733,6 +1770,293 @@ public class PDFView extends RelativeLayout {
         return pdfFile.getPageLinks(page);
     }
 
+    /**
+     * Searches a text in the pages displayed by the view and highlights the matches. The case is ignored, and parts of words
+     * are matched.
+     *
+     * @see #search(String, boolean, boolean)
+     */
+    public void search(@Nullable String query) {
+        search(query, false, false);
+    }
+
+    /**
+     * Searches a text in the pages displayed by the view and highlights the matches.
+     * <p>
+     * The search is done in the background, and its result is given to
+     * {@link Configurator#onSearchResult(OnSearchResultListener)}. The first match from the current page becomes the current
+     * match: it's highlighted with its own color and the view scrolls to it. {@link #goToNextSearchMatch()} and
+     * {@link #goToPreviousSearchMatch()} go through the others. The matches of the previous search stay highlighted until the
+     * result of the new one is known.
+     * <p>
+     * A new search cancels the running one, and a blank query is the same as {@link #clearSearch()}. The search is cleared
+     * when another document is loaded. Nothing is done as long as no document is loaded.
+     *
+     * @param query          Text to search. The spaces at its start and end are ignored, and its words (separated by spaces)
+     *                       have to follow each other.
+     * @param matchCase      True to only match the text with the same case.
+     * @param matchWholeWord True to only match whole words, and not parts of words.
+     * @see Configurator#searchHighlightColor(int)
+     * @see Configurator#searchCurrentHighlightColor(int)
+     */
+    public void search(@Nullable String query, boolean matchCase, boolean matchWholeWord) {
+        if (pdfFile == null) {
+            return;
+        }
+
+        String text = query == null ? "" : query.trim();
+        if (text.isEmpty()) {
+            clearSearch();
+            return;
+        }
+
+        if (textSearcher == null) {
+            textSearcher = new PdfTextSearcher(pdfFile);
+        }
+        hasSearch = true;
+        int flags = (matchCase ? PdfiumCore.SEARCH_MATCH_CASE : 0) | (matchWholeWord ? PdfiumCore.SEARCH_MATCH_WHOLE_WORD : 0);
+        textSearcher.search(pdfFile.getDisplayedDocumentPages(), text, flags, this::onSearchDone);
+    }
+
+    /**
+     * Cancels the search if it's running, and removes the highlighted matches.
+     */
+    public void clearSearch() {
+        clearSearchMatches();
+    }
+
+    /**
+     * Makes the match after the current one the current one, and scrolls to it. It goes back to the first match after the
+     * last one. The zoom stays the same.
+     * <p>
+     * Does nothing if there is no match.
+     */
+    public void goToNextSearchMatch() {
+        if (!searchMatches.isEmpty()) {
+            goToSearchMatch((currentSearchMatchIndex + 1) % searchMatches.size());
+        }
+    }
+
+    /**
+     * Makes the match before the current one the current one, and scrolls to it. It goes to the last match before the first
+     * one. The zoom stays the same.
+     * <p>
+     * Does nothing if there is no match.
+     */
+    public void goToPreviousSearchMatch() {
+        if (!searchMatches.isEmpty()) {
+            goToSearchMatch(currentSearchMatchIndex <= 0 ? searchMatches.size() - 1 : currentSearchMatchIndex - 1);
+        }
+    }
+
+    private void onSearchDone(List<SearchMatch> matches) {
+        if (pdfFile == null) {
+            return;
+        }
+
+        Map<Integer, List<SearchMatch>> matchesByDocumentPage = new HashMap<>();
+        for (SearchMatch match : matches) {
+            List<SearchMatch> pageMatches = matchesByDocumentPage.get(match.getPage());
+            if (pageMatches == null) {
+                pageMatches = new ArrayList<>();
+                matchesByDocumentPage.put(match.getPage(), pageMatches);
+            }
+            pageMatches.add(match);
+        }
+
+        List<SearchMatch> displayedMatches = new ArrayList<>();
+        for (int userPage = 0; userPage < pdfFile.getPagesCount(); userPage++) {
+            List<SearchMatch> pageMatches = matchesByDocumentPage.get(pdfFile.documentPage(userPage));
+            if (pageMatches != null) {
+                for (SearchMatch match : pageMatches) {
+                    displayedMatches.add(new SearchMatch(match.getPage(), userPage, match.getAreas()));
+                }
+            }
+        }
+
+        setSearchMatches(displayedMatches);
+        if (displayedMatches.isEmpty()) {
+            callbacks.callOnSearchResult(0, -1);
+        } else {
+            goToSearchMatch(findFirstSearchMatchFromCurrentPage());
+        }
+    }
+
+    private void setSearchMatches(List<SearchMatch> matches) {
+        searchMatches = matches;
+        searchMatchesByDocumentPage.clear();
+        currentSearchMatchIndex = -1;
+        for (SearchMatch match : matches) {
+            List<SearchMatch> pageMatches = searchMatchesByDocumentPage.get(match.getPage());
+            if (pageMatches == null) {
+                pageMatches = new ArrayList<>();
+                searchMatchesByDocumentPage.put(match.getPage(), pageMatches);
+            }
+            pageMatches.add(match);
+        }
+        redraw();
+    }
+
+    /**
+     * @return Index of the first match that is on the current page or after it, or 0 if there is none.
+     */
+    private int findFirstSearchMatchFromCurrentPage() {
+        for (int index = 0; index < searchMatches.size(); index++) {
+            if (searchMatches.get(index).getUserPage() >= currentPage) {
+                return index;
+            }
+        }
+        return 0;
+    }
+
+    private void goToSearchMatch(int index) {
+        currentSearchMatchIndex = index;
+        redraw();
+        scrollToSearchMatch(searchMatches.get(index));
+        callbacks.callOnSearchResult(searchMatches.size(), index);
+    }
+
+    /**
+     * Scrolls to put a match in the middle of the view, the zoom stays the same.
+     */
+    private void scrollToSearchMatch(SearchMatch match) {
+        float[] areas = match.getAreas();
+        int page = match.getUserPage();
+        if (areas.length < 4 || page < 0) {
+            return;
+        }
+
+        // A match spread over several lines is centered on its first one, where it starts
+        SizeF pageSize = pdfFile.getScaledPageSize(page, zoom);
+        float matchX = getPageStripX(page) + (areas[0] + areas[2]) / 2f * pageSize.getWidth();
+        float matchY = getPageStripY(page) + (areas[1] + areas[3]) / 2f * pageSize.getHeight();
+
+        animationManager.stopAll();
+        moveTo(getWidth() / 2f - matchX, getHeight() / 2f - matchY);
+        loadPageByOffset();
+    }
+
+    /**
+     * Sets the color of the matches of a search, except the current one. The default is a semi-transparent yellow.
+     *
+     * @see Configurator#searchHighlightColor(int)
+     */
+    public void setSearchHighlightColor(@ColorInt int color) {
+        searchHighlightPaint.setColor(color);
+        redraw();
+    }
+
+    /**
+     * Sets the color of the current match of a search, see {@link #goToNextSearchMatch()}. The default is a
+     * semi-transparent orange.
+     *
+     * @see Configurator#searchCurrentHighlightColor(int)
+     */
+    public void setSearchCurrentHighlightColor(@ColorInt int color) {
+        searchCurrentHighlightPaint.setColor(color);
+        redraw();
+    }
+
+    /**
+     * Cancels the search and removes its matches, the listener is told if there was a search to remove.
+     */
+    private void clearSearchMatches() {
+        if (textSearcher != null) {
+            textSearcher.cancel();
+        }
+
+        boolean hadSearch = hasSearch;
+        hasSearch = false;
+        searchMatches = Collections.emptyList();
+        searchMatchesByDocumentPage.clear();
+        currentSearchMatchIndex = -1;
+        if (hadSearch) {
+            redraw();
+            callbacks.callOnSearchResult(0, -1);
+        }
+    }
+
+    /**
+     * Clears the search, and releases what it used. The next search of another document starts from scratch.
+     */
+    private void resetSearch() {
+        clearSearchMatches();
+        if (textSearcher != null) {
+            textSearcher.close();
+            textSearcher = null;
+        }
+    }
+
+    private void drawSearchMatches(Canvas canvas) {
+        if (pdfFile == null || searchMatchesByDocumentPage.size() == 0) {
+            return;
+        }
+
+        // Only the matches of the visible pages are drawn
+        float viewStart = swipeVertical ? -currentYOffset : -currentXOffset;
+        float viewLength = swipeVertical ? getHeight() : getWidth();
+        int firstPage = pdfFile.getPageAtOffset(viewStart, zoom);
+        int lastPage = pdfFile.getPageAtOffset(viewStart + viewLength, zoom);
+
+        SearchMatch currentMatch = currentSearchMatchIndex >= 0 ? searchMatches.get(currentSearchMatchIndex) : null;
+        for (int page = firstPage; page <= lastPage; page++) {
+            drawPageSearchMatches(canvas, page, currentMatch);
+        }
+
+        // The current match is drawn last, to stay visible when it overlaps other matches
+        if (currentMatch != null) {
+            int page = currentMatch.getUserPage();
+            if (page >= firstPage && page <= lastPage) {
+                drawSearchMatch(canvas, currentMatch, getPageStripX(page), getPageStripY(page),
+                        pdfFile.getScaledPageSize(page, zoom), searchCurrentHighlightPaint);
+            }
+        }
+    }
+
+    private void drawPageSearchMatches(Canvas canvas, int page, @Nullable SearchMatch currentMatch) {
+        List<SearchMatch> pageMatches = searchMatchesByDocumentPage.get(pdfFile.documentPage(page));
+        if (pageMatches == null) {
+            return;
+        }
+
+        SizeF pageSize = pdfFile.getScaledPageSize(page, zoom);
+        float pageX = getPageStripX(page);
+        float pageY = getPageStripY(page);
+        for (SearchMatch match : pageMatches) {
+            if (match.getUserPage() == page && match != currentMatch) {
+                drawSearchMatch(canvas, match, pageX, pageY, pageSize, searchHighlightPaint);
+            }
+        }
+    }
+
+    private void drawSearchMatch(Canvas canvas, SearchMatch match, float pageX, float pageY, SizeF pageSize, Paint paint) {
+        float[] areas = match.getAreas();
+        // The areas are (left, top, right, bottom) quadruplets
+        for (int i = 0; i + 3 < areas.length; i += 4) {
+            canvas.drawRect(
+                    pageX + areas[i] * pageSize.getWidth(),
+                    pageY + areas[i + 1] * pageSize.getHeight(),
+                    pageX + areas[i + 2] * pageSize.getWidth(),
+                    pageY + areas[i + 3] * pageSize.getHeight(),
+                    paint
+            );
+        }
+    }
+
+    /**
+     * X position of a page on the big strip, see the explanations in {@link #onDraw(Canvas)}
+     */
+    private float getPageStripX(int page) {
+        return swipeVertical ? pdfFile.getSecondaryPageOffset(page, zoom) : pdfFile.getPageOffset(page, zoom);
+    }
+
+    /**
+     * Y position of a page on the big strip, see the explanations in {@link #onDraw(Canvas)}
+     */
+    private float getPageStripY(int page) {
+        return swipeVertical ? pdfFile.getPageOffset(page, zoom) : pdfFile.getSecondaryPageOffset(page, zoom);
+    }
+
     public void enableTextSelection(boolean enabled) {
         textSelectionEnabled = enabled;
         if (!enabled) {
@@ -2422,11 +2746,14 @@ public class PDFView extends RelativeLayout {
         private boolean selectionPopupEnabled = true;
         private OnSelectionActionListener onSelectionActionListener;
         private OnSelectionChangeListener onSelectionChangeListener;
+        private OnSearchResultListener onSearchResultListener;
         private Integer selectionHandleColor = null;
         private Integer selectionHighlightColor = null;
         private Integer selectionPopupBackgroundColor = null;
         private Integer selectionPopupTextColor = null;
         private CharSequence selectionPopupText = null;
+        private Integer searchHighlightColor = null;
+        private Integer searchCurrentHighlightColor = null;
         private boolean touchPriority = false;
         private boolean useBestQuality = false;
         private float thumbnailRatio = Constants.THUMBNAIL_RATIO;
@@ -2627,6 +2954,14 @@ public class PDFView extends RelativeLayout {
             return this;
         }
 
+        /**
+         * Sets the listener told when the result of a text search changes, see {@link PDFView#search(String)}.
+         */
+        public Configurator onSearchResult(OnSearchResultListener onSearchResultListener) {
+            this.onSearchResultListener = onSearchResultListener;
+            return this;
+        }
+
         public Configurator selectionPopupEnabled(boolean selectionPopupEnabled) {
             this.selectionPopupEnabled = selectionPopupEnabled;
             return this;
@@ -2654,6 +2989,24 @@ public class PDFView extends RelativeLayout {
 
         public Configurator selectionPopupText(CharSequence text) {
             this.selectionPopupText = text;
+            return this;
+        }
+
+        /**
+         * Sets the color of the matches of a text search, see {@link PDFView#search(String)}, except the current one.
+         * The default is a semi-transparent yellow.
+         */
+        public Configurator searchHighlightColor(@ColorInt int color) {
+            this.searchHighlightColor = color;
+            return this;
+        }
+
+        /**
+         * Sets the color of the current match of a text search, see {@link PDFView#goToNextSearchMatch()}.
+         * The default is a semi-transparent orange.
+         */
+        public Configurator searchCurrentHighlightColor(@ColorInt int color) {
+            this.searchCurrentHighlightColor = color;
             return this;
         }
 
@@ -2719,6 +3072,7 @@ public class PDFView extends RelativeLayout {
             PDFView.this.callbacks.setLinkHandler(linkHandler);
             PDFView.this.callbacks.setOnSelectionActionListener(onSelectionActionListener);
             PDFView.this.callbacks.setOnSelectionChangeListener(onSelectionChangeListener);
+            PDFView.this.callbacks.setOnSearchResultListener(onSearchResultListener);
             PDFView.this.setSwipeEnabled(enableSwipe);
             PDFView.this.setNightMode(nightMode);
             PDFView.this.enableTextSelection(textSelectionEnabled);
@@ -2728,6 +3082,8 @@ public class PDFView extends RelativeLayout {
             if (selectionPopupBackgroundColor != null) PDFView.this.setSelectionPopupBackgroundColor(selectionPopupBackgroundColor);
             if (selectionPopupTextColor != null) PDFView.this.setSelectionPopupTextColor(selectionPopupTextColor);
             if (selectionPopupText != null) PDFView.this.setSelectionPopupText(selectionPopupText);
+            if (searchHighlightColor != null) PDFView.this.setSearchHighlightColor(searchHighlightColor);
+            if (searchCurrentHighlightColor != null) PDFView.this.setSearchCurrentHighlightColor(searchCurrentHighlightColor);
             PDFView.this.enableDoubleTap(enableDoubletap);
             PDFView.this.setDefaultPage(defaultPage);
             PDFView.this.setSwipeVertical(!swipeHorizontal);

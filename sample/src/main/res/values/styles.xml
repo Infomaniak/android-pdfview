@@ -16,12 +16,19 @@
   -->
 <resources>
 
-    <style name="AppTheme" parent="Theme.MaterialComponents.Light.DarkActionBar">
+    <!-- The toolbar is in the layout (and not the one of the window) to be drawn behind the status bar and the display cutout -->
+    <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="colorAccent">@color/accent</item>
         <item name="colorControlNormal">@color/primary</item>
         <item name="colorOnSecondary">@android:color/white</item>
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryDark">@color/primaryDark</item>
         <item name="colorSecondary">@color/primary</item>
+    </style>
+
+    <!-- Light texts and icons on the primary color, like the ones of the action bar of the DarkActionBar themes -->
+    <style name="ThemeOverlay.Sample.Toolbar" parent="ThemeOverlay.MaterialComponents.Dark.ActionBar">
+        <!-- The cursor of the search field is of the activated color, which is the accent color by default: the one of the toolbar -->
+        <item name="colorControlActivated">?attr/colorOnPrimary</item>
     </style>
 </resources>
