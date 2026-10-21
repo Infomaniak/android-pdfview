@@ -2009,7 +2009,7 @@ public class PDFView extends RelativeLayout {
             float pageX = getPageStripX(page);
             float pageY = getPageStripY(page);
             for (SearchMatch match : pageMatches) {
-                if (match != currentMatch) {
+                if (match.getUserPage() == page && match != currentMatch) {
                     drawSearchMatch(canvas, match, pageX, pageY, pageSize, searchHighlightPaint);
                 }
             }
