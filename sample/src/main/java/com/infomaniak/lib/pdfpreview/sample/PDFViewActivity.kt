@@ -94,11 +94,16 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
     private fun applyWindowInsets() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
             val systemInsets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            val imeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
 
             // The toolbar goes behind the status bar and the display cutout, and its content is moved below them
             binding.appBar.updatePadding(left = systemInsets.left, top = systemInsets.top, right = systemInsets.right)
-            // The buttons stay above the navigation bar
-            binding.buttonContainer.updatePadding(left = systemInsets.left, right = systemInsets.right, bottom = systemInsets.bottom)
+            // The buttons stay above the navigation bar or the keyboard
+            binding.buttonContainer.updatePadding(
+                left = systemInsets.left,
+                right = systemInsets.right,
+                bottom = maxOf(systemInsets.bottom, imeInsets.bottom),
+            )
             windowInsets
         }
     }
