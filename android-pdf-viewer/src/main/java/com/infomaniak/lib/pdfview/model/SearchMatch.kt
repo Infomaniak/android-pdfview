@@ -19,10 +19,10 @@ package com.infomaniak.lib.pdfview.model
 /**
  * An occurrence of a searched text.
  *
- * @property page Index of the page in the document. It's not the position of the page in the view if the view displays only
- * some pages of the document, or displays a page several times.
+ * @property page Index of the page in the document.
+ * @property userPage Position of the displayed page in the view.
  * @property areas Areas covered by the match, usually one per line of text, as (left, top, right, bottom) quadruplets. Their
  * coordinates are fractions (between 0 and 1) of the width and height of the displayed page, so they don't depend on the size
  * of the page or on the zoom.
  */
-internal class SearchMatch(val page: Int, val areas: FloatArray)
+internal class SearchMatch(val page: Int, val userPage: Int, val areas: FloatArray)

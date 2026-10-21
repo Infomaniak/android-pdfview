@@ -125,7 +125,7 @@ internal class PdfTextSearcher(private val pdfFile: PdfFile) {
             areas[offset + 2] = rect.right
             areas[offset + 3] = rect.bottom
         }
-        return SearchMatch(page, areas)
+        return SearchMatch(page, -1, areas)
     }
 
     private companion object {

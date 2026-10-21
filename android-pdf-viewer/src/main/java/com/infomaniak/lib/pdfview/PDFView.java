@@ -92,7 +92,9 @@ import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * It supports animations, zoom, cache, and swipe.
@@ -1852,8 +1854,28 @@ public class PDFView extends RelativeLayout {
             return;
         }
 
-        setSearchMatches(matches);
-        if (matches.isEmpty()) {
+        Map<Integer, List<SearchMatch>> matchesByDocumentPage = new HashMap<>();
+        for (SearchMatch match : matches) {
+            List<SearchMatch> pageMatches = matchesByDocumentPage.get(match.getPage());
+            if (pageMatches == null) {
+                pageMatches = new ArrayList<>();
+                matchesByDocumentPage.put(match.getPage(), pageMatches);
+            }
+            pageMatches.add(match);
+        }
+
+        List<SearchMatch> displayedMatches = new ArrayList<>();
+        for (int userPage = 0; userPage < pdfFile.getPagesCount(); userPage++) {
+            List<SearchMatch> pageMatches = matchesByDocumentPage.get(pdfFile.documentPage(userPage));
+            if (pageMatches != null) {
+                for (SearchMatch match : pageMatches) {
+                    displayedMatches.add(new SearchMatch(match.getPage(), userPage, match.getAreas()));
+                }
+            }
+        }
+
+        setSearchMatches(displayedMatches);
+        if (displayedMatches.isEmpty()) {
             callbacks.callOnSearchResult(0, -1);
         } else {
             goToSearchMatch(findFirstSearchMatchFromCurrentPage());
@@ -1879,15 +1901,8 @@ public class PDFView extends RelativeLayout {
      * @return Index of the first match that is on the current page or after it, or 0 if there is none.
      */
     private int findFirstSearchMatchFromCurrentPage() {
-        int lastDocumentPage = -1;
-        int lastUserPage = -1;
         for (int index = 0; index < searchMatches.size(); index++) {
-            int documentPage = searchMatches.get(index).getPage();
-            if (documentPage != lastDocumentPage) {
-                lastDocumentPage = documentPage;
-                lastUserPage = pdfFile.userPage(documentPage);
-            }
-            if (lastUserPage >= currentPage) {
+            if (searchMatches.get(index).getUserPage() >= currentPage) {
                 return index;
             }
         }
@@ -1906,7 +1921,7 @@ public class PDFView extends RelativeLayout {
      */
     private void scrollToSearchMatch(SearchMatch match) {
         float[] areas = match.getAreas();
-        int page = pdfFile.userPage(match.getPage());
+        int page = match.getUserPage();
         if (areas.length < 4 || page < 0) {
             return;
         }
@@ -2003,7 +2018,7 @@ public class PDFView extends RelativeLayout {
         // The current match is drawn last, to stay visible when it overlaps other matches
         if (currentMatch != null) {
             for (int page = firstPage; page <= lastPage; page++) {
-                if (pdfFile.documentPage(page) == currentMatch.getPage()) {
+                if (page == currentMatch.getUserPage()) {
                     drawSearchMatch(canvas, currentMatch, getPageStripX(page), getPageStripY(page),
                             pdfFile.getScaledPageSize(page, zoom), searchCurrentHighlightPaint);
                 }
