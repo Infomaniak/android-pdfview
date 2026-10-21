@@ -2000,28 +2000,31 @@ public class PDFView extends RelativeLayout {
 
         SearchMatch currentMatch = currentSearchMatchIndex >= 0 ? searchMatches.get(currentSearchMatchIndex) : null;
         for (int page = firstPage; page <= lastPage; page++) {
-            List<SearchMatch> pageMatches = searchMatchesByDocumentPage.get(pdfFile.documentPage(page));
-            if (pageMatches == null) {
-                continue;
-            }
-
-            SizeF pageSize = pdfFile.getScaledPageSize(page, zoom);
-            float pageX = getPageStripX(page);
-            float pageY = getPageStripY(page);
-            for (SearchMatch match : pageMatches) {
-                if (match.getUserPage() == page && match != currentMatch) {
-                    drawSearchMatch(canvas, match, pageX, pageY, pageSize, searchHighlightPaint);
-                }
-            }
+            drawPageSearchMatches(canvas, page, currentMatch);
         }
 
         // The current match is drawn last, to stay visible when it overlaps other matches
         if (currentMatch != null) {
-            for (int page = firstPage; page <= lastPage; page++) {
-                if (page == currentMatch.getUserPage()) {
-                    drawSearchMatch(canvas, currentMatch, getPageStripX(page), getPageStripY(page),
-                            pdfFile.getScaledPageSize(page, zoom), searchCurrentHighlightPaint);
-                }
+            int page = currentMatch.getUserPage();
+            if (page >= firstPage && page <= lastPage) {
+                drawSearchMatch(canvas, currentMatch, getPageStripX(page), getPageStripY(page),
+                        pdfFile.getScaledPageSize(page, zoom), searchCurrentHighlightPaint);
+            }
+        }
+    }
+
+    private void drawPageSearchMatches(Canvas canvas, int page, @Nullable SearchMatch currentMatch) {
+        List<SearchMatch> pageMatches = searchMatchesByDocumentPage.get(pdfFile.documentPage(page));
+        if (pageMatches == null) {
+            return;
+        }
+
+        SizeF pageSize = pdfFile.getScaledPageSize(page, zoom);
+        float pageX = getPageStripX(page);
+        float pageY = getPageStripY(page);
+        for (SearchMatch match : pageMatches) {
+            if (match.getUserPage() == page && match != currentMatch) {
+                drawSearchMatch(canvas, match, pageX, pageY, pageSize, searchHighlightPaint);
             }
         }
     }
