@@ -278,6 +278,7 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
         Log.e(TAG, "creationDate = " + meta.creationDate)
         Log.e(TAG, "modDate = " + meta.modDate)
         printBookmarksTree(binding.pdfView.tableOfContents, "-")
+        search()
     }
 
     override fun onPageChanged(page: Int, pageCount: Int) {
