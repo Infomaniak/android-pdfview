@@ -111,6 +111,9 @@ pdfView.fromAsset(String)
     .selectionPopupBackgroundColor(Color) // background color of the action popup (default: #323232)
     .selectionPopupTextColor(Color) // text color of the action popup (default: white)
     .selectionPopupText(CharSequence) // label of the action popup (default: locale "Copy")
+    .searchHighlightColor(Color) // color of the matches of a text search, see PDFView#search() (default: semi-transparent yellow)
+    .searchCurrentHighlightColor(Color) // color of the current match of a text search (default: semi-transparent orange)
+    .onSearchResult(onSearchResultListener) // called when the result of a text search changes
     .load();
 ```
 
@@ -210,6 +213,57 @@ pdfView.fromUri(uri)
 
 // In your button click handler:
 binding.copyButton.setOnClickListener { pdfView.copySelection() }
+```
+
+## Text search
+
+`PDFView` searches a text in the document and highlights the matches, there is nothing else to set up:
+
+```kotlin
+pdfView.search("invoice")                  // ignores the case, matches parts of words
+pdfView.search("invoice", true, false)     // matchCase, matchWholeWord
+
+pdfView.goToNextSearchMatch()
+pdfView.goToPreviousSearchMatch()
+pdfView.clearSearch()
+```
+
+- `search(...)` looks for the text in the pages displayed by the view, in the background. It highlights every match and
+  makes the first one from the current page the current match: it's highlighted with its own color, and the view scrolls to it
+- A new search cancels the running one, so it can be called each time the user types a letter. A blank text is the same as `clearSearch()`
+- `goToNextSearchMatch()` and `goToPreviousSearchMatch()` change the current match, and go around the document
+- The search is cleared when another document is loaded
+- Nothing is searched as long as the document isn't loaded, call it from `onLoad` or later
+
+The result is given by `Configurator#onSearchResult(...)`, to show something like "3 / 12":
+
+```kotlin
+pdfView.fromUri(uri)
+    .onSearchResult { matchCount, currentMatchIndex ->
+        // matchCount is 0 if nothing was found, and currentMatchIndex is -1 then
+        status.text = if (matchCount > 0) "${currentMatchIndex + 1} / $matchCount" else "No results"
+    }
+    .load()
+```
+
+The sample has a complete example, with a search field in its toolbar.
+
+Known limitations, which come from the search of PDFium:
+
+- Only the text of the pages is searched, a scanned page without text has no result
+- Accents are not ignored: `eleve` doesn't match `élève`
+- A word hyphenated at the end of a line is not matched as a whole
+
+### Customization
+
+The colors can be configured via the `Configurator` (or later with `PDFView#setSearchHighlightColor(Int)` and
+`PDFView#setSearchCurrentHighlightColor(Int)`):
+
+```kotlin
+pdfView.fromUri(uri)
+    .searchHighlightColor(Color.argb(100, 255, 235, 59))       // color of the matches (default: semi-transparent yellow)
+    .searchCurrentHighlightColor(Color.argb(180, 255, 152, 0)) // color of the current match (default: semi-transparent orange)
+    .load()
 ```
 
 ## Pages fit policy

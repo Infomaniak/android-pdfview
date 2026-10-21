@@ -25,13 +25,24 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SearchView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
+import androidx.core.view.updatePadding
 import com.infomaniak.lib.pdfview.PDFView.Configurator
 import com.infomaniak.lib.pdfview.listener.OnErrorListener
 import com.infomaniak.lib.pdfview.listener.OnLoadCompleteListener
@@ -56,6 +67,8 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
 
     private val pdfScrollHandle by lazy { getScrollHandle() }
 
+    private var searchQuery = ""
+
     private val selectFileResult = registerForActivityResult(StartActivityForResult()) { activityResult ->
         if (activityResult.resultCode == RESULT_OK) {
             activityResult.data?.let { intent ->
@@ -66,11 +79,70 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The toolbar is drawn behind the status bar, whose icons then have to be light to be visible on it
+        enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
+        setSupportActionBar(binding.toolbar)
+        applyWindowInsets()
         initializePDFView()
         binding.selectFile.setOnClickListener { pickFile() }
         binding.copySelection.setOnClickListener { binding.pdfView.copySelection() }
+        initializeSearchBar()
+    }
+
+    private fun applyWindowInsets() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
+            val systemInsets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+
+            // The toolbar goes behind the status bar and the display cutout, and its content is moved below them
+            binding.appBar.updatePadding(left = systemInsets.left, top = systemInsets.top, right = systemInsets.right)
+            // The buttons stay above the navigation bar
+            binding.buttonContainer.updatePadding(left = systemInsets.left, right = systemInsets.right, bottom = systemInsets.bottom)
+            windowInsets
+        }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.search, menu)
+        val searchItem = menu.findItem(R.id.search)
+
+        (searchItem.actionView as SearchView).apply {
+            queryHint = getString(R.string.search_hint)
+            // Without a maximum width, the field is limited to its preferred width: the clear button wouldn't be at the end
+            maxWidth = Int.MAX_VALUE
+            // The field has a margin on each side, the one on the side of the clear button keeps it away from the toolbar edge.
+            // The margins of this layout are absolute (left and right), so a relative one (end) wouldn't replace them
+            findViewById<View>(androidx.appcompat.R.id.search_edit_frame)?.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                rightMargin = 0
+            }
+            setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+                override fun onQueryTextChange(newText: String): Boolean {
+                    searchQuery = newText
+                    search()
+                    return true
+                }
+
+                override fun onQueryTextSubmit(query: String): Boolean {
+                    binding.pdfView.goToNextSearchMatch()
+                    return false // Lets the SearchView hide the keyboard
+                }
+            })
+        }
+
+        searchItem.setOnActionExpandListener(object : MenuItem.OnActionExpandListener {
+            override fun onMenuItemActionExpand(item: MenuItem): Boolean {
+                binding.searchBar.visibility = View.VISIBLE
+                return true
+            }
+
+            override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
+                binding.searchBar.visibility = View.GONE
+                binding.pdfView.clearSearch()
+                return true
+            }
+        })
+        return true
     }
 
     private fun pickFile() {
@@ -147,6 +219,9 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
             .onSelectionAction { selectedText ->
                 Toast.makeText(this, selectedText, Toast.LENGTH_SHORT).show()
             }
+            .searchHighlightColor(ContextCompat.getColor(this, R.color.searchMatch))
+            .searchCurrentHighlightColor(ContextCompat.getColor(this, R.color.searchCurrentMatch))
+            .onSearchResult(::showSearchResult)
             .load()
     }
 
@@ -154,6 +229,30 @@ class PDFViewActivity : AppCompatActivity(), OnPageChangeListener, OnLoadComplet
         PasswordDialog(
             onPasswordEntered = { password -> displayFromUri(uri, password) },
         ).also { it.show(supportFragmentManager, "TAG") }
+    }
+
+    private fun initializeSearchBar() {
+        binding.previousMatch.setOnClickListener { binding.pdfView.goToPreviousSearchMatch() }
+        binding.nextMatch.setOnClickListener { binding.pdfView.goToNextSearchMatch() }
+        binding.matchCase.setOnCheckedChangeListener { _, _ -> search() }
+        binding.matchWholeWord.setOnCheckedChangeListener { _, _ -> search() }
+    }
+
+    private fun search() {
+        // The result comes from onSearchResult. A blank query clears the search, which is told the same way
+        if (searchQuery.isNotBlank()) binding.searchStatus.setText(R.string.search_in_progress)
+        binding.pdfView.search(searchQuery, binding.matchCase.isChecked, binding.matchWholeWord.isChecked)
+    }
+
+    private fun showSearchResult(matchCount: Int, currentMatchIndex: Int) {
+        val hasMatches = matchCount > 0
+        binding.previousMatch.isEnabled = hasMatches
+        binding.nextMatch.isEnabled = hasMatches
+        binding.searchStatus.text = when {
+            hasMatches -> getString(R.string.search_status, currentMatchIndex + 1, matchCount)
+            searchQuery.isBlank() -> ""
+            else -> getString(R.string.search_no_results)
+        }
     }
 
     private fun printBookmarksTree(bookmarks: List<PdfDocument.Bookmark>, sep: String) {

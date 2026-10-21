@@ -92,6 +92,11 @@ public class Callbacks {
      */
     private OnSelectionChangeListener onSelectionChangeListener;
 
+    /**
+     * Call back object to call when the result of a text search changes
+     */
+    private OnSearchResultListener onSearchResultListener;
+
     public void setOnReadyForPrinting(OnReadyForPrintingListener onReadyForPrintingListener) {
         this.onReadyForPrintingListener = onReadyForPrintingListener;
     }
@@ -250,6 +255,16 @@ public class Callbacks {
         }
     }
 
+    public void setOnSearchResultListener(OnSearchResultListener onSearchResultListener) {
+        this.onSearchResultListener = onSearchResultListener;
+    }
+
+    public void callOnSearchResult(int matchCount, int currentMatchIndex) {
+        if (onSearchResultListener != null) {
+            onSearchResultListener.onSearchResult(matchCount, currentMatchIndex);
+        }
+    }
+
     public void clear() {
         // Not clearing onAttach and onDetach listeners because those are called before view initialization
         onLoadCompleteListener = null;
@@ -265,5 +280,6 @@ public class Callbacks {
         linkHandler = null;
         onSelectionActionListener = null;
         onSelectionChangeListener = null;
+        onSearchResultListener = null;
     }
 }

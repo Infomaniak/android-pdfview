@@ -30,6 +30,8 @@ import com.shockwave.pdfium.util.Size;
 import com.shockwave.pdfium.util.SizeF;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 class PdfFile {
@@ -426,13 +428,50 @@ class PdfFile {
         return pdfiumCore.getCharBox(pdfDocument, docPage, charIndex);
     }
 
-    public void dispose() {
-        if (pdfiumCore != null && pdfDocument != null) {
-            pdfiumCore.closeDocument(pdfDocument);
+    /**
+     * Searches a text in a page of the document, see {@link PdfiumCore#searchText(PdfDocument, int, String, int)}.
+     * <p>
+     * Can be called from any thread. Disposing the document waits for the page being searched, and the pages searched
+     * after that find nothing.
+     *
+     * @param documentPage A page of the document, which isn't always the page displayed at the same position.
+     */
+    public List<PdfDocument.SearchResult> searchText(int documentPage, String query, int flags) {
+        synchronized (lock) {
+            if (pdfDocument == null) {
+                return Collections.emptyList();
+            }
+            return pdfiumCore.searchText(pdfDocument, documentPage, query, flags);
         }
+    }
 
-        pdfDocument = null;
-        originalUserPages = null;
+    /**
+     * @return The pages of the document that are displayed, once each, in the order they are displayed.
+     */
+    public int[] getDisplayedDocumentPages() {
+        int[] documentPages = new int[pagesCount];
+        SparseBooleanArray alreadyAdded = new SparseBooleanArray();
+        int count = 0;
+        for (int userPage = 0; userPage < pagesCount; userPage++) {
+            int documentPage = documentPage(userPage);
+            if (documentPage >= 0 && !alreadyAdded.get(documentPage)) {
+                alreadyAdded.put(documentPage, true);
+                documentPages[count++] = documentPage;
+            }
+        }
+        return Arrays.copyOf(documentPages, count);
+    }
+
+    public void dispose() {
+        // Not while a page is being searched, see searchText()
+        synchronized (lock) {
+            if (pdfiumCore != null && pdfDocument != null) {
+                pdfiumCore.closeDocument(pdfDocument);
+            }
+
+            pdfDocument = null;
+            originalUserPages = null;
+        }
     }
 
     /**
@@ -457,6 +496,25 @@ class PdfFile {
             }
         }
         return userPage;
+    }
+
+    /**
+     * Reverse of {@link #documentPage(int)}.
+     *
+     * @param documentPage A page of the document.
+     * @return The first page displaying it, or -1 if the user pages don't include it
+     */
+    public int userPage(int documentPage) {
+        if (originalUserPages == null) {
+            return documentPage >= 0 && documentPage < getPagesCount() ? documentPage : -1;
+        }
+
+        for (int userPage = 0; userPage < originalUserPages.length; userPage++) {
+            if (originalUserPages[userPage] == documentPage) {
+                return userPage;
+            }
+        }
+        return -1;
     }
 
     public int documentPage(int userPage) {
